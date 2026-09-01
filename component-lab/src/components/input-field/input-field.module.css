@@ -1,0 +1,33 @@
+.root {
+  width: 320px;
+  padding: var(--pb-space-3);
+
+  background: var(--pb-bg);
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-lg);
+  box-shadow: var(--pb-shadow);
+
+  font-family: var(--pb-font-family);
+  color: var(--pb-text);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.root:hover {
+  border-color: var(--pb-border-hover);
+  box-shadow:
+    0 6px 16px rgb(0 0 0 / 0.10),
+    0 2px 4px rgb(0 0 0 / 0.08);
+}
+
+.input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  box-sizing: border-box;
+  overflow-y: hidden;
+  resize: none;
+}

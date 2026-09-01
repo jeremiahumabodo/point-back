@@ -1,0 +1,28 @@
+:root {
+  --pb-font-family: Inter, system-ui, sans-serif;
+
+  --pb-radius-sm: 6px;
+  --pb-radius-md: 10px;
+  --pb-radius-lg: 14px;
+
+  --pb-space-1: 4px;
+  --pb-space-2: 8px;
+  --pb-space-3: 12px;
+  --pb-space-4: 16px;
+
+  --pb-bg: #ffffff;
+  --pb-bg-muted: #f6f6f6;
+
+  --pb-text: #171717;
+  --pb-text-muted: #737373;
+
+  --pb-border: #e5e5e5;
+  --pb-border-hover: #c7c7c7;
+  --pb-action: #2d2d2d;
+  --pb-action-hover: #171717;
+  --pb-focus-ring: #6b8afd;
+
+  --pb-shadow:
+    0 4px 12px rgb(0 0 0 / 0.08),
+    0 1px 3px rgb(0 0 0 / 0.08);
+}

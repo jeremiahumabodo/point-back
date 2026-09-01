@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+/dist/
+storybook-static/
+.output/
+.wxt/
+
+# Test output
+coverage/
+test-results/
+playwright-report/
+
+# Local runtime data
+agent-bridge/data/*.db
+agent-bridge/data/*.db-*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment configuration
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Editor and operating-system files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
