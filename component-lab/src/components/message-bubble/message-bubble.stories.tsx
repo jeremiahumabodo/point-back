@@ -17,6 +17,8 @@ type Story = StoryObj<typeof meta>;
 export const User: Story = {
   args: {
     messageRole: "user",
+    author: "You",
+    timestamp: "10:42 AM",
     children: "Could you explain why this component rerenders?",
     dieticMode: false
   },
@@ -25,6 +27,8 @@ export const User: Story = {
 export const Assistant: Story = {
   args: {
     messageRole: "assistant",
+    author: "Codex",
+    timestamp: "10:43 AM",
     children: "I can help investigate that. Let’s start with the component’s props and state changes.",
     dieticMode: false
   },

@@ -1,13 +1,17 @@
-import { useState, type HTMLAttributes, type MouseEvent, type ReactNode } from "react";
+import React, { useState, type HTMLAttributes, type MouseEvent, type ReactNode } from "react";
 import styles from "./message-bubble.module.css";
 
 export type MessageRole = "user" | "assistant";
 
-const dietics = ['this','that','these','those','it','here' ]
+const dietics = new Set(["this", "that", "these", "those", "it", "here"]);
 
 export type MessageBubbleProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode;
   messageRole: MessageRole;
+  /** Identifies the sender, for example "You", "Codex", or another agent name. */
+  author?: string;
+  /** A display-ready message time, supplied by the caller. */
+  timestamp: string;
   dieticMode?: boolean;
 };
 
@@ -15,6 +19,8 @@ export function MessageBubble({
   children,
   className,
   messageRole,
+  author = messageRole === "user" ? "You" : "Codex",
+  timestamp,
   dieticMode = false,
   ...props
 }: MessageBubbleProps) {
@@ -31,7 +37,7 @@ export function MessageBubble({
       }
 
       const normalizedWord = word.toLowerCase().replace(/[^a-z]/g, "");
-      const isDieticWord = normalizedWord !== "" && dietics.includes(normalizedWord);
+      const isDieticWord = normalizedWord !== "" && dietics.has(normalizedWord);
 
       if (!isDieticWord) {
         return word;
@@ -41,15 +47,16 @@ export function MessageBubble({
 
       function selectDietic(e: MouseEvent<HTMLButtonElement>): void {
         e.preventDefault();
-        setSelectedDietic((current) => (current === dieticKey ? null : dieticKey));
+        setSelectedDietic((current: string | null) => (current === dieticKey ? null : dieticKey));
       }
 
-      return (
-        <button
-          key={dieticKey}
-          type="button"
-          onClick={selectDietic}
-          style={{
+      return React.createElement(
+        "button",
+        {
+          key: dieticKey,
+          type: "button",
+          onClick: selectDietic,
+          style: {
             background: "none",
             border: "none",
             padding: 0,
@@ -57,23 +64,30 @@ export function MessageBubble({
             color: selectedDietic === dieticKey ? "#2563eb" : "inherit",
             textDecoration: "underline",
             cursor: "pointer",
-          }}
-          aria-label={`Dietic word: ${normalizedWord}`}
-        >
-          {word}
-        </button>
+          },
+          "aria-label": `Dietic word: ${normalizedWord}`,
+        },
+        word,
       );
     });
   };
 
-  return (
-    <div
-      className={[styles.root, styles[messageRole], className]
-        .filter(Boolean)
-        .join(" ")}
-      {...props}
-    >
-      {processedChildren()}
-    </div>
+  return React.createElement(
+    "div",
+    {
+      className: [styles.root, styles[messageRole], className].filter(Boolean).join(" "),
+      ...props,
+    },
+    React.createElement(
+      "div",
+      { className: styles.content },
+      processedChildren(),
+    ),
+    React.createElement(
+      "div",
+      { className: styles.metadata },
+      React.createElement("span", { className: styles.author }, author),
+      React.createElement("time", { className: styles.timestamp }, timestamp),
+    ),
   );
 }

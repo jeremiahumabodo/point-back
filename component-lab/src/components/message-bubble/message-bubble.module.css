@@ -10,6 +10,28 @@
   white-space: pre-wrap;
 }
 
+.content {
+  min-width: 0;
+}
+
+.metadata {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--pb-space-3);
+  margin-top: var(--pb-space-1);
+  font-size: 12px;
+  line-height: 1.3;
+  opacity: 0.8;
+}
+
+.author {
+  font-weight: 600;
+}
+
+.timestamp {
+  white-space: nowrap;
+}
+
 .user {
   margin-left: auto;
   color: var(--pb-bg);

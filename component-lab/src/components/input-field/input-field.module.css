@@ -1,4 +1,6 @@
 .root {
+  display: flex;
+  align-items: center;
   width: 320px;
   padding: var(--pb-space-3);
 
@@ -27,6 +29,7 @@
   outline: 0;
   background: transparent;
   font: inherit;
+  line-height: 1.45;
   box-sizing: border-box;
   overflow-y: hidden;
   resize: none;
