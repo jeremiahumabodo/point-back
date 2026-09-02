@@ -372,6 +372,15 @@
   text-decoration-style: solid;
 }
 
+#pointback-root .pb-user .pb-deictic-reference {
+  color: #bfdbfe;
+  cursor: pointer;
+}
+
+#pointback-root .pb-user .pb-deictic-reference-linked {
+  color: #bbf7d0;
+}
+
 #pointback-root .pb-input:focus {
   border-color: var(--pb-focus-ring);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-focus-ring) 30%, transparent);

@@ -21,7 +21,10 @@ type DeicticReference = {
 
 type StructuredMessage = {
   content: string;
-  references: Array<Omit<DeicticReference, "targets"> & { components: ComponentFootprint[] }>;
+  references: Array<Omit<DeicticReference, "targets"> & {
+    components: ComponentFootprint[];
+    targets: Element[];
+  }>;
 };
 
 export default defineContentScript({
@@ -111,7 +114,7 @@ export default defineContentScript({
     let highlightedDeicticReferenceId: string | null = null;
     let linkReferenceId: string | null = null;
     let nextDeicticReferenceId = 1;
-    const deicticWords = new Set(["this", "that", "these", "those", "it", "here"]);
+    const deicticWords = new Set(["this", "that", "these", "those", "here"]);
 
     function isPointBackUi(element: Element) {
       return root.contains(element);
@@ -271,7 +274,7 @@ export default defineContentScript({
         range.setEndBefore(token);
         const before = document.createElement("div");
         before.append(range.cloneContents());
-        const start = before.innerText.replace(/\r/g, "").length;
+        const start = (before.textContent ?? "").replace(/\r/g, "").length;
         const term = token.dataset.term ?? "";
         return { id: token.dataset.referenceId ?? "", term, start, end: start + term.length };
       });
@@ -460,8 +463,7 @@ export default defineContentScript({
     }
 
     function updateSendButton() {
-      const hasUnmappedReferences = deicticMode && deicticReferences.some((reference) => reference.targets.length === 0);
-      sendButton.disabled = !getDraft().trim() || selectedElements.size === 0 || hasUnmappedReferences;
+      sendButton.disabled = !getDraft().trim();
     }
 
     function updateDeicticAvailability() {
@@ -512,7 +514,17 @@ export default defineContentScript({
       if (messages.querySelector(".pb-empty-state")) renderEmptyState();
     }
 
+    function setTheme(isDark: boolean) {
+      panel.classList.toggle("pb-dark", isDark);
+      themeToggle.setAttribute("aria-checked", String(isDark));
+    }
+
+    function applySystemTheme() {
+      setTheme(window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }
+
     function openEmptyPanel() {
+      applySystemTheme();
       stopSelecting();
       clearSelection();
       updateSelectionHeader();
@@ -599,7 +611,20 @@ export default defineContentScript({
 
       const body = document.createElement("p");
       body.className = "pb-message-content";
-      body.textContent = message.content;
+      let cursor = 0;
+      for (const reference of [...message.references].sort((left, right) => left.start - right.start)) {
+        body.append(message.content.slice(cursor, reference.start));
+
+        const token = document.createElement("span");
+        token.className = "pb-deictic-reference pb-deictic-reference-linked";
+        token.textContent = message.content.slice(reference.start, reference.end);
+        token.title = "Hover to highlight linked component(s)";
+        token.addEventListener("pointerenter", () => showDeicticTargetHighlights(reference.targets));
+        token.addEventListener("pointerleave", hideDeicticTargetHighlights);
+        body.append(token);
+        cursor = reference.end;
+      }
+      body.append(message.content.slice(cursor));
 
       const metadata = document.createElement("div");
       metadata.className = "pb-message-metadata";
@@ -685,8 +710,7 @@ export default defineContentScript({
       }
     });
     themeToggle.addEventListener("click", () => {
-      const isDark = panel.classList.toggle("pb-dark");
-      themeToggle.setAttribute("aria-checked", String(isDark));
+      setTheme(!panel.classList.contains("pb-dark"));
     });
     closeButton.addEventListener("click", () => {
       panel.hidden = true;
@@ -725,21 +749,25 @@ export default defineContentScript({
       const draft = getDraft();
       const content = draft.trim();
       const leadingWhitespaceLength = draft.length - draft.trimStart().length;
-      if (!content || selectedElements.size === 0 || deicticReferences.some((reference) => reference.targets.length === 0)) return;
+      if (!content) return;
 
       const message: StructuredMessage = {
         content,
         references: deicticMode
-          ? deicticReferences.map((reference) => ({
-              id: reference.id,
-              term: reference.term,
-              start: reference.start - leadingWhitespaceLength,
-              end: reference.end - leadingWhitespaceLength,
-              components: reference.targets.map(createComponentFootprint),
-            }))
+          ? deicticReferences
+              .filter((reference) => reference.targets.length > 0)
+              .map((reference) => ({
+                id: reference.id,
+                term: reference.term,
+                start: reference.start - leadingWhitespaceLength,
+                end: reference.end - leadingWhitespaceLength,
+                components: reference.targets.map(createComponentFootprint),
+                targets: reference.targets,
+              }))
           : [],
       };
       appendMessage(message);
+      stopSelecting();
       deicticReferences = [];
       input.replaceChildren();
       hideDeicticTooltip();
