@@ -21,6 +21,15 @@ export type MessagePanelProps = {
   readonly onSend?: (message: string) => void;
 };
 
+function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+  if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+    return;
+  }
+
+  event.preventDefault();
+  event.currentTarget.form?.requestSubmit();
+}
+
 export function MessagePanel({
   componentName,
   messages,
@@ -40,15 +49,6 @@ export function MessagePanel({
 
     onSend?.(message);
     setDraft("");
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
-      return;
-    }
-
-    event.preventDefault();
-    event.currentTarget.form?.requestSubmit();
   }
 
   return (
