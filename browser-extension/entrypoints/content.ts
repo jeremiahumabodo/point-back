@@ -1,7 +1,28 @@
 import "../assets/content.css";
 
-type PointBackMessage = { type: "pointback:start-selection" };
-type SelectionMode = "initial" | "add" | "replace";
+type PointBackMessage = { type: "pointback:start-selection" | "pointback:open-panel" };
+type SelectionMode = "initial" | "add" | "replace" | "link";
+
+type ComponentFootprint = {
+  name: string;
+  tagName: string;
+  id?: string;
+  componentName?: string;
+  ariaLabel?: string;
+};
+
+type DeicticReference = {
+  id: string;
+  term: string;
+  start: number;
+  end: number;
+  targets: Element[];
+};
+
+type StructuredMessage = {
+  content: string;
+  references: Array<Omit<DeicticReference, "targets"> & { components: ComponentFootprint[] }>;
+};
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -16,6 +37,8 @@ export default defineContentScript({
       <div class="pb-lasso" hidden></div>
       <div class="pb-selected-highlights"></div>
       <div class="pb-replacement-highlight" hidden></div>
+      <div class="pb-deictic-target-highlights"></div>
+      <div class="pb-deictic-tooltip" role="tooltip" hidden></div>
       <aside class="pb-panel" aria-label="PointBack conversation" hidden>
         <header class="pb-header">
           <div>
@@ -38,8 +61,15 @@ export default defineContentScript({
         </header>
         <div class="pb-messages" aria-live="polite"></div>
         <form class="pb-composer">
-          <textarea class="pb-input" rows="1" placeholder="Ask about these components..." aria-label="Message" disabled></textarea>
-          <button class="pb-send" type="submit" aria-label="Send message" title="Send message" disabled>↑</button>
+          <div class="pb-composer-row">
+            <div class="pb-input" contenteditable="plaintext-only" role="textbox" aria-multiline="true" aria-label="Message" data-placeholder="Ask about these components..."></div>
+            <button class="pb-deictic-toggle" type="button" aria-pressed="true" aria-label="Toggle deictic mode" title="Toggle deictic mode">
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="m6.4 9.6 3.2-3.2M5.1 11.9l-1 1a2.5 2.5 0 0 1-3.5-3.5l3-3a2.5 2.5 0 0 1 3.5 0M10.9 4.1l1-1a2.5 2.5 0 0 1 3.5 3.5l-3 3a2.5 2.5 0 0 1-3.5 0"></path>
+              </svg>
+            </button>
+            <button class="pb-send" type="submit" aria-label="Send message" title="Send message" disabled>↑</button>
+          </div>
         </form>
       </aside>
     `;
@@ -51,6 +81,7 @@ export default defineContentScript({
     const lasso = root.querySelector<HTMLElement>(".pb-lasso")!;
     const selectedHighlights = root.querySelector<HTMLElement>(".pb-selected-highlights")!;
     const replacementHighlight = root.querySelector<HTMLElement>(".pb-replacement-highlight")!;
+    const deicticTargetHighlights = root.querySelector<HTMLElement>(".pb-deictic-target-highlights")!;
     const panel = root.querySelector<HTMLElement>(".pb-panel")!;
     const panelHeader = root.querySelector<HTMLElement>(".pb-header")!;
     const selectComponentsButton = root.querySelector<HTMLButtonElement>(".pb-select-components")!;
@@ -60,7 +91,9 @@ export default defineContentScript({
     const componentList = root.querySelector<HTMLElement>(".pb-component-list")!;
     const messages = root.querySelector<HTMLElement>(".pb-messages")!;
     const form = root.querySelector<HTMLFormElement>(".pb-composer")!;
-    const input = root.querySelector<HTMLTextAreaElement>(".pb-input")!;
+    const input = root.querySelector<HTMLElement>(".pb-input")!;
+    const deicticToggle = root.querySelector<HTMLButtonElement>(".pb-deictic-toggle")!;
+    const deicticTooltip = root.querySelector<HTMLElement>(".pb-deictic-tooltip")!;
     const sendButton = root.querySelector<HTMLButtonElement>(".pb-send")!;
 
     const selectedElements = new Set<Element>();
@@ -72,6 +105,13 @@ export default defineContentScript({
     let selectionMode: SelectionMode = "initial";
     let replacementElement: Element | null = null;
     let isAddModeActive = false;
+    let deicticMode = true;
+    let deicticReferences: DeicticReference[] = [];
+    let activeDeicticReferenceId: string | null = null;
+    let highlightedDeicticReferenceId: string | null = null;
+    let linkReferenceId: string | null = null;
+    let nextDeicticReferenceId = 1;
+    const deicticWords = new Set(["this", "that", "these", "those", "it", "here"]);
 
     function isPointBackUi(element: Element) {
       return root.contains(element);
@@ -102,6 +142,33 @@ export default defineContentScript({
 
     function hideReplacementHighlight() {
       replacementHighlight.hidden = true;
+    }
+
+    function showDeicticTargetHighlights(targets: readonly Element[]) {
+      deicticTargetHighlights.replaceChildren(
+        ...targets.flatMap((target) => {
+          const rect = target.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) return [];
+          const highlight = document.createElement("div");
+          highlight.className = "pb-deictic-target-highlight";
+          highlight.style.left = `${rect.left}px`;
+          highlight.style.top = `${rect.top}px`;
+          highlight.style.width = `${rect.width}px`;
+          highlight.style.height = `${rect.height}px`;
+          return [highlight];
+        }),
+      );
+    }
+
+    function hideDeicticTargetHighlights() {
+      highlightedDeicticReferenceId = null;
+      deicticTargetHighlights.replaceChildren();
+    }
+
+    function refreshDeicticTargetHighlights() {
+      const reference = deicticReferences.find((item) => item.id === highlightedDeicticReferenceId);
+      if (reference) showDeicticTargetHighlights(reference.targets);
+      else hideDeicticTargetHighlights();
     }
 
     function renderSelectedHighlights() {
@@ -180,6 +247,229 @@ export default defineContentScript({
           return tag;
         }),
       );
+      updateDeicticAvailability();
+    }
+
+    function getDraft() {
+      return input.innerText.replace(/\r/g, "");
+    }
+
+    function getDeicticReferenceCandidates(text: string) {
+      const references: Array<Pick<DeicticReference, "term" | "start" | "end">> = [];
+      for (const match of text.matchAll(/[a-z]+/gi)) {
+        const term = match[0].toLowerCase();
+        const start = match.index ?? 0;
+        if (deicticWords.has(term)) references.push({ term, start, end: start + match[0].length });
+      }
+      return references;
+    }
+
+    function getRenderedDeicticReferences() {
+      return [...input.querySelectorAll<HTMLElement>(".pb-deictic-reference")].map((token) => {
+        const range = document.createRange();
+        range.selectNodeContents(input);
+        range.setEndBefore(token);
+        const before = document.createElement("div");
+        before.append(range.cloneContents());
+        const start = before.innerText.replace(/\r/g, "").length;
+        const term = token.dataset.term ?? "";
+        return { id: token.dataset.referenceId ?? "", term, start, end: start + term.length };
+      });
+    }
+
+    function syncDeicticReferences(text: string) {
+      const referencesById = new Map(deicticReferences.map((reference) => [reference.id, reference]));
+      const renderedReferences = getRenderedDeicticReferences();
+      const matchedReferenceIds = new Set<string>();
+      let newestReferenceId: string | null = null;
+      deicticReferences = getDeicticReferenceCandidates(text).map((candidate) => {
+        const renderedReference = renderedReferences.find(
+          (reference) =>
+            !matchedReferenceIds.has(reference.id) &&
+            reference.term === candidate.term &&
+            reference.start === candidate.start &&
+            reference.end === candidate.end,
+        );
+        const existing = renderedReference ? referencesById.get(renderedReference.id) : undefined;
+        if (existing && renderedReference) {
+          matchedReferenceIds.add(renderedReference.id);
+          return { ...existing, ...candidate };
+        }
+
+        const reference = { ...candidate, id: `reference-${nextDeicticReferenceId++}`, targets: [] };
+        newestReferenceId = reference.id;
+        return reference;
+      });
+
+      const removedReferences = [...referencesById.values()].filter(
+        (reference) => !matchedReferenceIds.has(reference.id),
+      );
+      if (removedReferences.length > 0) {
+        const targetsStillReferenced = new Set(deicticReferences.flatMap((reference) => reference.targets));
+        for (const removedReference of removedReferences) {
+          for (const target of removedReference.targets) {
+            if (targetsStillReferenced.has(target)) continue;
+            target.classList.remove("pointback-selected", "pointback-highlight");
+            selectedElements.delete(target);
+          }
+        }
+        renderSelectedHighlights();
+        updateSelectionHeader();
+      }
+
+      if (newestReferenceId) activeDeicticReferenceId = newestReferenceId;
+      if (!deicticReferences.some((reference) => reference.id === activeDeicticReferenceId)) {
+        activeDeicticReferenceId = deicticReferences.at(-1)?.id ?? null;
+      }
+      return newestReferenceId;
+    }
+
+    function createComponentFootprint(element: Element): ComponentFootprint {
+      const id = element.getAttribute("id");
+      const componentName = element.getAttribute("data-component-name");
+      const ariaLabel = element.getAttribute("aria-label");
+      return {
+        name: getComponentName(element),
+        tagName: element.tagName.toLowerCase(),
+        ...(id ? { id } : {}),
+        ...(componentName ? { componentName } : {}),
+        ...(ariaLabel ? { ariaLabel } : {}),
+      };
+    }
+
+    function hideDeicticTooltip() {
+      deicticTooltip.hidden = true;
+    }
+
+    function showDeicticTooltip(reference: HTMLElement) {
+      const rect = reference.getBoundingClientRect();
+      deicticTooltip.textContent = `Point to a component to link “${reference.dataset.term}”.`;
+      deicticTooltip.style.left = `${rect.left}px`;
+      deicticTooltip.style.top = `${rect.bottom + 6}px`;
+      deicticTooltip.hidden = false;
+    }
+
+    function getCaretOffset() {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return null;
+      const range = selection.getRangeAt(0);
+      if (!input.contains(range.endContainer)) return null;
+
+      const beforeCaret = range.cloneRange();
+      beforeCaret.selectNodeContents(input);
+      beforeCaret.setEnd(range.endContainer, range.endOffset);
+      return beforeCaret.toString().length;
+    }
+
+    function restoreCaret(offset: number, textNodes: Array<{ node: Text; start: number; end: number }>, tokens: Array<{ element: HTMLElement; reference: DeicticReference }>) {
+      const range = document.createRange();
+      const textNode = textNodes.find(({ start, end }) => offset >= start && offset <= end);
+      if (textNode) {
+        range.setStart(textNode.node, offset - textNode.start);
+      } else {
+        const token = tokens.find(({ reference }) => offset >= reference.start && offset <= reference.end);
+        if (token && offset <= token.reference.start) range.setStartBefore(token.element);
+        else if (token) range.setStartAfter(token.element);
+        else range.selectNodeContents(input);
+      }
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    function setActiveDeicticReference(reference: DeicticReference) {
+      activeDeicticReferenceId = reference.id;
+      input.querySelectorAll<HTMLElement>(".pb-deictic-reference").forEach((token) => {
+        token.classList.toggle("pb-deictic-reference-active", token.dataset.referenceId === reference.id);
+      });
+    }
+
+    function isPluralDeictic(reference: DeicticReference) {
+      return reference.term === "these" || reference.term === "those";
+    }
+
+    function linkComponentToReference(reference: DeicticReference, component: Element) {
+      if (!selectedElements.has(component)) addToSelection(component);
+      if (isPluralDeictic(reference)) {
+        if (!reference.targets.includes(component)) reference.targets.push(component);
+      } else {
+        reference.targets = [component];
+      }
+      input.querySelector<HTMLElement>(`[data-reference-id="${reference.id}"]`)?.classList.add("pb-deictic-reference-linked");
+      updateSelectionHeader();
+      updateSendButton();
+    }
+
+    function decorateDeicticReferences() {
+      if (!deicticMode) return;
+
+      const caretOffset = document.activeElement === input ? getCaretOffset() : null;
+      const text = getDraft();
+      const newestReferenceId = syncDeicticReferences(text);
+      const fragment = document.createDocumentFragment();
+      const textNodes: Array<{ node: Text; start: number; end: number }> = [];
+      const tokens: Array<{ element: HTMLElement; reference: DeicticReference }> = [];
+      let cursor = 0;
+      for (const reference of deicticReferences) {
+        const before = text.slice(cursor, reference.start);
+        if (before) {
+          const node = document.createTextNode(before);
+          textNodes.push({ node, start: cursor, end: reference.start });
+          fragment.append(node);
+        }
+        const token = document.createElement("span");
+        token.className = "pb-deictic-reference";
+        token.classList.toggle("pb-deictic-reference-active", reference.id === activeDeicticReferenceId);
+        token.classList.toggle("pb-deictic-reference-linked", reference.targets.length > 0);
+        token.contentEditable = "false";
+        token.dataset.term = reference.term;
+        token.dataset.referenceId = reference.id;
+        token.title = `Point to a component to link “${reference.term}”.`;
+        token.textContent = text.slice(reference.start, reference.end);
+        token.addEventListener("pointerover", () => {
+          setActiveDeicticReference(reference);
+          highlightedDeicticReferenceId = reference.id;
+          showDeicticTooltip(token);
+          showDeicticTargetHighlights(reference.targets);
+        });
+        token.addEventListener("pointerout", () => {
+          hideDeicticTooltip();
+          hideDeicticTargetHighlights();
+          if (!replacementElement) hideReplacementHighlight();
+        });
+        token.addEventListener("click", () => {
+          setActiveDeicticReference(reference);
+          highlightedDeicticReferenceId = reference.id;
+          showDeicticTargetHighlights(reference.targets);
+          startSelecting("link", null, reference.id);
+        });
+        tokens.push({ element: token, reference });
+        fragment.append(token);
+        cursor = reference.end;
+      }
+      const after = text.slice(cursor);
+      if (after) {
+        const node = document.createTextNode(after);
+        textNodes.push({ node, start: cursor, end: text.length });
+        fragment.append(node);
+      }
+      input.replaceChildren(fragment);
+      if (caretOffset !== null) restoreCaret(caretOffset, textNodes, tokens);
+      if (newestReferenceId) startSelecting("link", null, newestReferenceId);
+    }
+
+    function updateSendButton() {
+      const hasUnmappedReferences = deicticMode && deicticReferences.some((reference) => reference.targets.length === 0);
+      sendButton.disabled = !getDraft().trim() || selectedElements.size === 0 || hasUnmappedReferences;
+    }
+
+    function updateDeicticAvailability() {
+      const currentSelections = new Set(selectedElements);
+      deicticReferences.forEach((reference) => {
+        reference.targets = reference.targets.filter((target) => currentSelections.has(target));
+      });
+      updateSendButton();
     }
 
     function removeComponent(element: Element) {
@@ -188,8 +478,8 @@ export default defineContentScript({
       renderSelectedHighlights();
       removeHighlight();
       updateSelectionHeader();
-      input.disabled = selectedElements.size === 0;
-      sendButton.disabled = !input.value.trim() || selectedElements.size === 0;
+      input.contentEditable = "plaintext-only";
+      updateSendButton();
       refreshEmptyState();
     }
 
@@ -202,7 +492,7 @@ export default defineContentScript({
       title.className = "pb-empty-title";
       title.textContent =
         selectedElements.size === 0
-          ? "Select a component to start a conversation"
+          ? "Start a conversation about this page"
           : selectedElements.size === 1
             ? "Start a conversation about this component"
             : "Start a conversation about these components";
@@ -211,7 +501,7 @@ export default defineContentScript({
       description.className = "pb-empty-description";
       description.textContent =
         selectedElements.size === 0
-          ? "Add a component before sending a message."
+          ? "Type a message and point to components as you refer to them."
           : "Ask about their behavior, styling, or implementation.";
 
       state.append(title, description);
@@ -222,13 +512,23 @@ export default defineContentScript({
       if (messages.querySelector(".pb-empty-state")) renderEmptyState();
     }
 
+    function openEmptyPanel() {
+      stopSelecting();
+      clearSelection();
+      updateSelectionHeader();
+      renderEmptyState();
+      panel.hidden = false;
+      input.contentEditable = "plaintext-only";
+      updateSendButton();
+    }
+
     function openPanel(resetMessages: boolean) {
       if (selectedElements.size === 0) return;
       updateSelectionHeader();
       if (resetMessages) renderEmptyState();
       else refreshEmptyState();
       panel.hidden = false;
-      input.disabled = false;
+      input.contentEditable = "plaintext-only";
       input.focus();
     }
 
@@ -238,17 +538,26 @@ export default defineContentScript({
       selectComponentsButton.setAttribute("aria-pressed", "false");
       lassoStart = null;
       replacementElement = null;
+      linkReferenceId = null;
       hideReplacementHighlight();
+      hideDeicticTargetHighlights();
       lasso.hidden = true;
       removeHighlight();
       hint.hidden = true;
-      document.documentElement.classList.remove("pointback-selecting");
+      hint.classList.remove("pb-cursor-hint");
+      cancelButton.hidden = false;
+      document.documentElement.classList.remove("pointback-selecting", "pointback-link-singular");
       updateSelectionHeader();
     }
 
-    function startSelecting(mode: SelectionMode = "initial", replacement: Element | null = null) {
+    function startSelecting(
+      mode: SelectionMode = "initial",
+      replacement: Element | null = null,
+      linkReference: string | null = null,
+    ) {
       selectionMode = mode;
       replacementElement = replacement;
+      linkReferenceId = linkReference;
       if (mode === "initial") {
         panel.hidden = true;
         clearSelection();
@@ -256,18 +565,27 @@ export default defineContentScript({
       stopSelecting();
       selectionMode = mode;
       replacementElement = replacement;
+      linkReferenceId = linkReference;
       isAddModeActive = mode === "add";
       selectComponentsButton.setAttribute("aria-pressed", String(isAddModeActive));
       updateSelectionHeader();
+      const isLinkSelection = mode === "link";
+      const linkedReference = deicticReferences.find((reference) => reference.id === linkReferenceId);
+      const isSingularLink = isLinkSelection && !!linkedReference && !isPluralDeictic(linkedReference);
+      hint.classList.toggle("pb-cursor-hint", isLinkSelection);
+      cancelButton.hidden = isLinkSelection;
       selectionInstruction.textContent =
         mode === "add"
           ? "Click a component, or drag to add multiple components."
           : mode === "replace"
             ? "Click a component to replace the selected tag."
-            : "Click a component, or drag to select multiple.";
+            : mode === "link"
+              ? "Point to Component"
+              : "Click a component, or drag to select multiple.";
       isSelecting = true;
       hint.hidden = false;
       document.documentElement.classList.add("pointback-selecting");
+      document.documentElement.classList.toggle("pointback-link-singular", isSingularLink);
     }
 
     function cancelSelection() {
@@ -275,18 +593,18 @@ export default defineContentScript({
       stopSelecting();
     }
 
-    function appendMessage(content: string) {
+    function appendMessage(message: StructuredMessage) {
       const bubble = document.createElement("article");
       bubble.className = "pb-message pb-user";
 
       const body = document.createElement("p");
       body.className = "pb-message-content";
-      body.textContent = content;
+      body.textContent = message.content;
 
       const metadata = document.createElement("div");
       metadata.className = "pb-message-metadata";
       const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date());
-      metadata.textContent = `You · ${time}`;
+      metadata.textContent = `You · ${time}${message.references.length ? ` · ${message.references.length} reference${message.references.length === 1 ? "" : "s"}` : ""}`;
 
       bubble.append(body, metadata);
       messages.querySelector(".pb-empty-state")?.remove();
@@ -375,10 +693,24 @@ export default defineContentScript({
       clearSelection();
     });
 
+    deicticToggle.addEventListener("click", () => {
+      deicticMode = !deicticMode;
+      deicticToggle.setAttribute("aria-pressed", String(deicticMode));
+      if (deicticMode) {
+        input.focus();
+        decorateDeicticReferences();
+      } else {
+        if (isSelecting && selectionMode === "link") stopSelecting();
+        deicticReferences = [];
+        input.textContent = getDraft();
+        hideDeicticTooltip();
+      }
+      updateSendButton();
+    });
+
     input.addEventListener("input", () => {
-      input.style.height = "auto";
-      input.style.height = `${input.scrollHeight}px`;
-      sendButton.disabled = !input.value.trim() || selectedElements.size === 0;
+      decorateDeicticReferences();
+      updateSendButton();
     });
 
     input.addEventListener("keydown", (event) => {
@@ -390,12 +722,29 @@ export default defineContentScript({
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const message = input.value.trim();
-      if (!message || selectedElements.size === 0) return;
+      const draft = getDraft();
+      const content = draft.trim();
+      const leadingWhitespaceLength = draft.length - draft.trimStart().length;
+      if (!content || selectedElements.size === 0 || deicticReferences.some((reference) => reference.targets.length === 0)) return;
+
+      const message: StructuredMessage = {
+        content,
+        references: deicticMode
+          ? deicticReferences.map((reference) => ({
+              id: reference.id,
+              term: reference.term,
+              start: reference.start - leadingWhitespaceLength,
+              end: reference.end - leadingWhitespaceLength,
+              components: reference.targets.map(createComponentFootprint),
+            }))
+          : [],
+      };
       appendMessage(message);
-      input.value = "";
-      input.style.height = "auto";
-      sendButton.disabled = true;
+      deicticReferences = [];
+      input.replaceChildren();
+      hideDeicticTooltip();
+      activeDeicticReferenceId = null;
+      updateSendButton();
     });
 
     document.addEventListener(
@@ -413,6 +762,10 @@ export default defineContentScript({
       "pointermove",
       (event) => {
         if (!isSelecting || !(event.target instanceof Element) || isPointBackUi(event.target)) return;
+        if (selectionMode === "link") {
+          hint.style.left = `${event.clientX + 14}px`;
+          hint.style.top = `${event.clientY + 14}px`;
+        }
         if (lassoStart) updateLasso(event.clientX, event.clientY);
         if (highlightedElement === event.target) return;
         removeHighlight();
@@ -432,22 +785,23 @@ export default defineContentScript({
         suppressNextClick = true;
 
         const mode = selectionMode;
-        if (moved) {
-          const lassoedComponents = getLassoedComponents(event.clientX, event.clientY);
-          if (mode === "initial") clearSelection();
-          if (mode === "replace") {
-            if (lassoedComponents[0]) replaceSelection(lassoedComponents[0]);
-          } else {
-            for (const element of lassoedComponents) addToSelection(element);
-          }
+        const linkReference = mode === "link"
+          ? deicticReferences.find((reference) => reference.id === linkReferenceId)
+          : undefined;
+        const pickedComponents = moved ? getLassoedComponents(event.clientX, event.clientY) : [event.target];
+
+        if (mode === "link" && linkReference) {
+          const componentsToLink = isPluralDeictic(linkReference) ? pickedComponents : pickedComponents.slice(0, 1);
+          for (const component of componentsToLink) linkComponentToReference(linkReference, component);
         } else if (mode === "replace") {
-          replaceSelection(event.target);
+          if (pickedComponents[0]) replaceSelection(pickedComponents[0]);
         } else {
           if (mode === "initial") clearSelection();
-          addToSelection(event.target);
+          for (const component of pickedComponents) addToSelection(component);
         }
 
-        if (mode === "add") {
+        const keepSelecting = mode === "add" || (mode === "link" && !!linkReference && isPluralDeictic(linkReference));
+        if (keepSelecting) {
           lassoStart = null;
           lasso.hidden = true;
           removeHighlight();
@@ -472,10 +826,12 @@ export default defineContentScript({
 
     window.addEventListener("scroll", () => {
       renderSelectedHighlights();
+      refreshDeicticTargetHighlights();
       if (replacementElement) showReplacementHighlight(replacementElement);
     }, true);
     window.addEventListener("resize", () => {
       renderSelectedHighlights();
+      refreshDeicticTargetHighlights();
       if (replacementElement) showReplacementHighlight(replacementElement);
     });
 
@@ -484,6 +840,7 @@ export default defineContentScript({
     });
 
     browser.runtime.onMessage.addListener((message: PointBackMessage) => {
+      if (message.type === "pointback:open-panel") openEmptyPanel();
       if (message.type === "pointback:start-selection") startSelecting();
     });
   },
