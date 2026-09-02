@@ -16,11 +16,21 @@ export default defineContentScript({
       <aside class="pb-panel" aria-label="PointBack conversation" hidden>
         <header class="pb-header">
           <div>
-            <p class="pb-eyebrow">Components</p>
             <h2 class="pb-component-name"></h2>
             <div class="pb-component-list" aria-label="Selected components"></div>
           </div>
-          <button class="pb-close" type="button" aria-label="Close conversation">×</button>
+          <div class="pb-header-actions">
+            <button class="pb-select-components" type="button" aria-label="Select components">
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <rect x="2" y="2" width="12" height="12" rx="1"></rect>
+                <path d="m7 6 3 3-1.5.25L8 11z"></path>
+              </svg>
+            </button>
+            <button class="pb-theme-toggle" type="button" role="switch" aria-label="Dark mode" aria-checked="false">
+              <span class="pb-theme-toggle-thumb" aria-hidden="true"></span>
+            </button>
+            <button class="pb-close" type="button" aria-label="Close conversation">×</button>
+          </div>
         </header>
         <div class="pb-messages" aria-live="polite"></div>
         <form class="pb-composer">
@@ -35,6 +45,9 @@ export default defineContentScript({
     const cancelButton = root.querySelector<HTMLButtonElement>(".pb-cancel-selection")!;
     const lasso = root.querySelector<HTMLElement>(".pb-lasso")!;
     const panel = root.querySelector<HTMLElement>(".pb-panel")!;
+    const panelHeader = root.querySelector<HTMLElement>(".pb-header")!;
+    const selectComponentsButton = root.querySelector<HTMLButtonElement>(".pb-select-components")!;
+    const themeToggle = root.querySelector<HTMLButtonElement>(".pb-theme-toggle")!;
     const closeButton = root.querySelector<HTMLButtonElement>(".pb-close")!;
     const componentName = root.querySelector<HTMLElement>(".pb-component-name")!;
     const componentList = root.querySelector<HTMLElement>(".pb-component-list")!;
@@ -48,6 +61,7 @@ export default defineContentScript({
     let isSelecting = false;
     let lassoStart: { x: number; y: number } | null = null;
     let suppressNextClick = false;
+    let panelDrag: { offsetX: number; offsetY: number } | null = null;
 
     function isPointBackUi(element: Element) {
       return root.contains(element);
@@ -81,7 +95,7 @@ export default defineContentScript({
 
     function updateSelectionHeader() {
       const names = [...selectedElements].map(getComponentName);
-      componentName.textContent = names.length === 1 ? names[0] : `${names.length} components selected`;
+      componentName.textContent = `${names.length} component${names.length === 1 ? "" : "s"} selected`;
       componentList.replaceChildren(
         ...names.map((name) => {
           const chip = document.createElement("span");
@@ -101,7 +115,7 @@ export default defineContentScript({
       title.className = "pb-empty-title";
       title.textContent =
         selectedElements.size === 1
-          ? `Start a conversation about ${componentName.textContent}`
+          ? "Start a conversation about this component"
           : "Start a conversation about these components";
 
       const description = document.createElement("p");
@@ -194,7 +208,42 @@ export default defineContentScript({
       }
     }
 
+    panelHeader.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || event.target instanceof Element && event.target.closest("button")) return;
+
+      const rect = panel.getBoundingClientRect();
+      panelDrag = { offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
+      panelHeader.setPointerCapture(event.pointerId);
+      panel.classList.add("pb-panel-dragging");
+    });
+
+    panelHeader.addEventListener("pointermove", (event) => {
+      if (!panelDrag) return;
+
+      const width = panel.offsetWidth;
+      const height = panel.offsetHeight;
+      const left = Math.min(Math.max(0, event.clientX - panelDrag.offsetX), window.innerWidth - width);
+      const top = Math.min(Math.max(0, event.clientY - panelDrag.offsetY), window.innerHeight - height);
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+      panel.style.right = "auto";
+      panel.style.bottom = "auto";
+    });
+
+    function stopPanelDrag() {
+      panelDrag = null;
+      panel.classList.remove("pb-panel-dragging");
+    }
+
+    panelHeader.addEventListener("pointerup", stopPanelDrag);
+    panelHeader.addEventListener("pointercancel", stopPanelDrag);
+
     cancelButton.addEventListener("click", cancelSelection);
+    selectComponentsButton.addEventListener("click", startSelecting);
+    themeToggle.addEventListener("click", () => {
+      const isDark = panel.classList.toggle("pb-dark");
+      themeToggle.setAttribute("aria-checked", String(isDark));
+    });
     closeButton.addEventListener("click", () => {
       panel.hidden = true;
       clearSelection();
