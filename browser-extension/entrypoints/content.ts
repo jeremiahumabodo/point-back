@@ -1,15 +1,9 @@
 import "../assets/content.css";
+import { resolveComponent } from "../component-resolution/resolve-component";
+import type { ComponentFootprint } from "../component-resolution/types";
 
 type PointBackMessage = { type: "pointback:start-selection" | "pointback:open-panel" };
 type SelectionMode = "initial" | "add" | "replace" | "link";
-
-type ComponentFootprint = {
-  name: string;
-  tagName: string;
-  id?: string;
-  componentName?: string;
-  ariaLabel?: string;
-};
 
 type DeicticReference = {
   id: string;
@@ -63,8 +57,36 @@ export default defineContentScript({
           </div>
         </header>
         <div class="pb-messages" aria-live="polite"></div>
+        <section id="pb-settings-pane" class="pb-settings-pane" aria-labelledby="pb-settings-title" hidden>
+          <div class="pb-settings-pane-header">
+            <button class="pb-settings-close" type="button" aria-label="Back to conversation" title="Back to conversation">
+              <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 3 4.5 8l5 5M5 8h7"></path></svg>
+            </button>
+            <h3 id="pb-settings-title">Connection Settings</h3>
+          </div>
+          <form class="pb-settings-form">
+            <label class="pb-settings-field">
+              <span>Agent bridge address</span>
+              <input class="pb-agent-bridge-address" type="url" inputmode="url" placeholder="http://127.0.0.1:3000" autocomplete="off" required>
+            </label>
+            <label class="pb-settings-field">
+              <span>Project directory</span>
+              <input class="pb-project-directory" type="text" placeholder="C:\\path\\to\\project" autocomplete="off" required>
+            </label>
+            <div class="pb-settings-actions">
+              <button class="pb-settings-cancel" type="button">Cancel</button>
+              <button class="pb-settings-save" type="submit">Save</button>
+            </div>
+          </form>
+        </section>
         <form class="pb-composer">
           <div class="pb-composer-row">
+            <button class="pb-settings" type="button" aria-label="Conversation settings" aria-expanded="false" aria-controls="pb-settings-pane" title="Conversation settings">
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M6.7 1.2h2.6l.4 1.6c.4.2.8.4 1.1.7l1.6-.5 1.3 2.3-1.2 1.1c.1.4.1.8 0 1.3l1.2 1.1-1.3 2.3-1.6-.5c-.3.3-.7.5-1.1.7l-.4 1.6H6.7l-.4-1.6c-.4-.2-.8-.4-1.1-.7l-1.6.5-1.3-2.3 1.2-1.1a4.5 4.5 0 0 1 0-1.3L2.3 5.3 3.6 3l1.6.5c.3-.3.7-.5 1.1-.7l.4-1.6Z"></path>
+                <circle cx="8" cy="7" r="2"></circle>
+              </svg>
+            </button>
             <div class="pb-input" contenteditable="plaintext-only" role="textbox" aria-multiline="true" aria-label="Message" data-placeholder="Ask about these components..."></div>
             <button class="pb-deictic-toggle" type="button" aria-pressed="true" aria-label="Toggle deictic mode" title="Toggle deictic mode">
               <svg aria-hidden="true" viewBox="0 0 16 16">
@@ -94,6 +116,13 @@ export default defineContentScript({
     const componentList = root.querySelector<HTMLElement>(".pb-component-list")!;
     const messages = root.querySelector<HTMLElement>(".pb-messages")!;
     const form = root.querySelector<HTMLFormElement>(".pb-composer")!;
+    const settingsButton = root.querySelector<HTMLButtonElement>(".pb-settings")!;
+    const settingsPane = root.querySelector<HTMLElement>(".pb-settings-pane")!;
+    const settingsForm = root.querySelector<HTMLFormElement>(".pb-settings-form")!;
+    const settingsCloseButton = root.querySelector<HTMLButtonElement>(".pb-settings-close")!;
+    const settingsCancelButton = root.querySelector<HTMLButtonElement>(".pb-settings-cancel")!;
+    const bridgeAddressInput = root.querySelector<HTMLInputElement>(".pb-agent-bridge-address")!;
+    const projectDirectoryInput = root.querySelector<HTMLInputElement>(".pb-project-directory")!;
     const input = root.querySelector<HTMLElement>(".pb-input")!;
     const deicticToggle = root.querySelector<HTMLButtonElement>(".pb-deictic-toggle")!;
     const deicticTooltip = root.querySelector<HTMLElement>(".pb-deictic-tooltip")!;
@@ -121,12 +150,7 @@ export default defineContentScript({
     }
 
     function getComponentName(element: Element): string {
-      return (
-        element.getAttribute("data-component-name") ||
-        element.getAttribute("aria-label") ||
-        element.id ||
-        element.tagName.toLowerCase()
-      );
+      return resolveComponent(element).name;
     }
 
     function removeHighlight() {
@@ -253,6 +277,20 @@ export default defineContentScript({
       updateDeicticAvailability();
     }
 
+    function setSettingsOpen(isOpen: boolean) {
+      settingsPane.hidden = !isOpen;
+      messages.hidden = isOpen;
+      form.hidden = isOpen;
+      settingsButton.setAttribute("aria-expanded", String(isOpen));
+      if (isOpen) bridgeAddressInput.focus();
+    }
+
+    async function loadSettings() {
+      const settings = await browser.storage.local.get(["agentBridgeAddress", "projectDirectory"]);
+      bridgeAddressInput.value = settings.agentBridgeAddress ?? "";
+      projectDirectoryInput.value = settings.projectDirectory ?? "";
+    }
+
     function getDraft() {
       return input.innerText.replace(/\r/g, "");
     }
@@ -328,16 +366,7 @@ export default defineContentScript({
     }
 
     function createComponentFootprint(element: Element): ComponentFootprint {
-      const id = element.getAttribute("id");
-      const componentName = element.getAttribute("data-component-name");
-      const ariaLabel = element.getAttribute("aria-label");
-      return {
-        name: getComponentName(element),
-        tagName: element.tagName.toLowerCase(),
-        ...(id ? { id } : {}),
-        ...(componentName ? { componentName } : {}),
-        ...(ariaLabel ? { ariaLabel } : {}),
-      };
+      return resolveComponent(element);
     }
 
     function hideDeicticTooltip() {
@@ -702,6 +731,19 @@ export default defineContentScript({
     panelHeader.addEventListener("pointercancel", stopPanelDrag);
 
     cancelButton.addEventListener("click", cancelSelection);
+    settingsButton.addEventListener("click", () => setSettingsOpen(settingsPane.hidden));
+    settingsCloseButton.addEventListener("click", () => setSettingsOpen(false));
+    settingsCancelButton.addEventListener("click", () => setSettingsOpen(false));
+    settingsForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void browser.storage.local
+        .set({
+          agentBridgeAddress: bridgeAddressInput.value.trim(),
+          projectDirectory: projectDirectoryInput.value.trim(),
+        })
+        .then(() => setSettingsOpen(false));
+    });
+    void loadSettings();
     selectComponentsButton.addEventListener("click", () => {
       if (isSelecting && selectionMode === "add") {
         stopSelecting();
@@ -713,6 +755,7 @@ export default defineContentScript({
       setTheme(!panel.classList.contains("pb-dark"));
     });
     closeButton.addEventListener("click", () => {
+      setSettingsOpen(false);
       panel.hidden = true;
       clearSelection();
     });

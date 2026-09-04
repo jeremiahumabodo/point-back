@@ -2,6 +2,7 @@ import { defineConfig } from "wxt";
 
 export default defineConfig({
   manifest: {
+    permissions: ["storage"],
     action: {
       default_title: "Activate PointBack",
     },
