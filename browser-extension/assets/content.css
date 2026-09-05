@@ -29,7 +29,12 @@
   flex-direction: column;
   width: 400px;
   height: 520px;
+  min-width: 320px;
+  min-height: 360px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
   overflow: hidden;
+  resize: both;
   color: var(--pb-text);
   background: var(--pb-bg);
   border: 1px solid var(--pb-border);
@@ -166,6 +171,7 @@
 }
 
 #pointback-root .pb-select-components,
+#pointback-root .pb-settings,
 #pointback-root .pb-close {
   width: 28px;
   height: 28px;
@@ -179,6 +185,7 @@
 }
 
 #pointback-root .pb-select-components:hover,
+#pointback-root .pb-settings:hover,
 #pointback-root .pb-close:hover {
   color: var(--pb-text);
   background: var(--pb-bg-muted);
@@ -255,6 +262,7 @@
 }
 
 #pointback-root .pb-select-components:focus-visible,
+#pointback-root .pb-settings:focus-visible,
 #pointback-root .pb-theme-toggle:focus-visible,
 #pointback-root .pb-close:focus-visible {
   outline: 2px solid var(--pb-focus-ring);
@@ -263,7 +271,8 @@
 
 #pointback-root .pb-messages[hidden],
 #pointback-root .pb-composer[hidden],
-#pointback-root .pb-settings-pane[hidden] {
+#pointback-root .pb-settings-pane[hidden],
+#pointback-root .pb-history-pane[hidden] {
   display: none;
 }
 
@@ -327,7 +336,8 @@
   border-top: 1px solid var(--pb-border);
 }
 
-#pointback-root .pb-settings-pane {
+#pointback-root .pb-settings-pane,
+#pointback-root .pb-history-pane {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -347,7 +357,8 @@
   font: 600 16px/1.3 var(--pb-font-family);
 }
 
-#pointback-root .pb-settings-close {
+#pointback-root .pb-settings-close,
+#pointback-root .pb-history-close {
   width: 28px;
   height: 28px;
   padding: 0;
@@ -359,7 +370,8 @@
   font: 24px/1 var(--pb-font-family);
 }
 
-#pointback-root .pb-settings-close svg {
+#pointback-root .pb-settings-close svg,
+#pointback-root .pb-history-close svg {
   width: 18px;
   height: 18px;
   fill: none;
@@ -369,7 +381,8 @@
   stroke-width: 1.5;
 }
 
-#pointback-root .pb-settings-close:hover {
+#pointback-root .pb-settings-close:hover,
+#pointback-root .pb-history-close:hover {
   color: var(--pb-text);
   background: var(--pb-bg-muted);
 }
@@ -399,6 +412,7 @@
 
 #pointback-root .pb-settings-field input:focus,
 #pointback-root .pb-settings-close:focus-visible,
+#pointback-root .pb-history-close:focus-visible,
 #pointback-root .pb-settings-actions button:focus-visible {
   border-color: var(--pb-focus-ring);
   outline: 2px solid var(--pb-focus-ring);
@@ -428,6 +442,61 @@
 #pointback-root .pb-settings-save {
   color: var(--pb-bg);
   background: var(--pb-action);
+}
+
+#pointback-root .pb-new-chat {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 9px;
+  padding: 10px 12px;
+  color: var(--pb-bg);
+  background: linear-gradient(135deg, var(--pb-action-hover), var(--pb-action));
+  border: 1px solid color-mix(in srgb, var(--pb-bg) 15%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 15%), inset 0 1px rgb(255 255 255 / 12%);
+  cursor: pointer;
+  font: 600 13px/1 var(--pb-font-family);
+  letter-spacing: .01em;
+  text-align: left;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+#pointback-root .pb-new-chat:hover {
+  box-shadow: 0 5px 10px rgb(0 0 0 / 20%), inset 0 1px rgb(255 255 255 / 16%);
+  transform: translateY(-1px);
+}
+
+#pointback-root .pb-new-chat:active {
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 25%);
+  transform: translateY(0);
+}
+
+#pointback-root .pb-new-chat:focus-visible {
+  outline: 2px solid var(--pb-focus-ring);
+  outline-offset: 2px;
+}
+
+#pointback-root .pb-new-chat span {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  background: color-mix(in srgb, var(--pb-bg) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pb-bg) 25%, transparent);
+  border-radius: 6px;
+  font: 20px/1 var(--pb-font-family);
+}
+
+#pointback-root .pb-history-list {
+  flex: 1;
+}
+
+#pointback-root .pb-history-list p {
+  margin: 0;
+  color: var(--pb-text-muted);
+  font: 13px/1.4 var(--pb-font-family);
+  text-align: center;
 }
 
 #pointback-root .pb-composer-row {
@@ -495,7 +564,7 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--pb-focus-ring) 30%, transparent);
 }
 
-#pointback-root .pb-settings,
+#pointback-root .pb-history,
 #pointback-root .pb-deictic-toggle {
   display: grid;
   flex: 0 0 auto;
@@ -510,6 +579,7 @@
   cursor: pointer;
 }
 
+#pointback-root .pb-history svg,
 #pointback-root .pb-settings svg,
 #pointback-root .pb-deictic-toggle svg {
   width: 16px;
@@ -521,8 +591,8 @@
   stroke-width: 1.5;
 }
 
-#pointback-root .pb-settings:hover,
-#pointback-root .pb-settings:focus-visible {
+#pointback-root .pb-history:hover,
+#pointback-root .pb-history:focus-visible {
   color: var(--pb-text);
   outline: 2px solid var(--pb-focus-ring);
   outline-offset: 2px;
@@ -536,6 +606,37 @@
 #pointback-root .pb-deictic-toggle:disabled {
   cursor: not-allowed;
   opacity: .45;
+}
+
+#pointback-root .pb-deictic-settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font: 600 13px/1 var(--pb-font-family);
+}
+
+#pointback-root .pb-composer-new-chat {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border-radius: 6px;
+}
+
+#pointback-root .pb-composer-new-chat svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
 }
 
 #pointback-root .pb-reference-mappings {

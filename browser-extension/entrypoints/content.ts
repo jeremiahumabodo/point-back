@@ -1,6 +1,8 @@
 import "../assets/content.css";
 import { resolveComponent } from "../component-resolution/resolve-component";
 import type { ComponentFootprint } from "../component-resolution/types";
+import { createHistoryController } from "../history/history-controller";
+import { createSettingsController } from "../settings/settings-controller";
 
 type PointBackMessage = { type: "pointback:start-selection" | "pointback:open-panel" };
 type SelectionMode = "initial" | "add" | "replace" | "link";
@@ -50,6 +52,12 @@ export default defineContentScript({
               </svg>
               <span class="pb-add-indicator" aria-hidden="true">+</span>
             </button>
+            <button class="pb-settings" type="button" aria-label="Conversation settings" aria-expanded="false" aria-controls="pb-settings-pane" title="Conversation settings">
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M6.7 1.2h2.6l.4 1.6c.4.2.8.4 1.1.7l1.6-.5 1.3 2.3-1.2 1.1c.1.4.1.8 0 1.3l1.2 1.1-1.3 2.3-1.6-.5c-.3.3-.7.5-1.1.7l-.4 1.6H6.7l-.4-1.6c-.4-.2-.8-.4-1.1-.7l-1.6.5-1.3-2.3 1.2-1.1a4.5 4.5 0 0 1 0-1.3L2.3 5.3 3.6 3l1.6.5c.3-.3.7-.5 1.1-.7l.4-1.6Z"></path>
+                <circle cx="8" cy="7" r="2"></circle>
+              </svg>
+            </button>
             <button class="pb-theme-toggle" type="button" role="switch" aria-label="Dark mode" aria-checked="false" title="Toggle dark mode">
               <span class="pb-theme-toggle-thumb" aria-hidden="true"></span>
             </button>
@@ -73,24 +81,42 @@ export default defineContentScript({
               <span>Project directory</span>
               <input class="pb-project-directory" type="text" placeholder="C:\\path\\to\\project" autocomplete="off" required>
             </label>
+            <button class="pb-deictic-toggle pb-deictic-settings-toggle" type="button" aria-pressed="true" aria-label="Toggle component references" title="Toggle component references">
+              <span>Reference UI components</span>
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="m6.4 9.6 3.2-3.2M5.1 11.9l-1 1a2.5 2.5 0 0 1-3.5-3.5l3-3a2.5 2.5 0 0 1 3.5 0M10.9 4.1l1-1a2.5 2.5 0 0 1 3.5 3.5l-3 3a2.5 2.5 0 0 1-3.5 0"></path>
+              </svg>
+            </button>
             <div class="pb-settings-actions">
               <button class="pb-settings-cancel" type="button">Cancel</button>
               <button class="pb-settings-save" type="submit">Save</button>
             </div>
           </form>
         </section>
+        <section id="pb-history-pane" class="pb-history-pane" aria-labelledby="pb-history-title" hidden>
+          <div class="pb-settings-pane-header">
+            <button class="pb-history-close" type="button" aria-label="Back to conversation" title="Back to conversation">
+              <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 3 4.5 8l5 5M5 8h7"></path></svg>
+            </button>
+            <h3 id="pb-history-title">Chat History</h3>
+          </div>
+          <div class="pb-history-list">
+            <p>No saved chats yet.</p>
+          </div>
+        </section>
         <form class="pb-composer">
           <div class="pb-composer-row">
-            <button class="pb-settings" type="button" aria-label="Conversation settings" aria-expanded="false" aria-controls="pb-settings-pane" title="Conversation settings">
+            <button class="pb-history" type="button" aria-label="Chat history" aria-expanded="false" aria-controls="pb-history-pane" title="Chat history">
               <svg aria-hidden="true" viewBox="0 0 16 16">
-                <path d="M6.7 1.2h2.6l.4 1.6c.4.2.8.4 1.1.7l1.6-.5 1.3 2.3-1.2 1.1c.1.4.1.8 0 1.3l1.2 1.1-1.3 2.3-1.6-.5c-.3.3-.7.5-1.1.7l-.4 1.6H6.7l-.4-1.6c-.4-.2-.8-.4-1.1-.7l-1.6.5-1.3-2.3 1.2-1.1a4.5 4.5 0 0 1 0-1.3L2.3 5.3 3.6 3l1.6.5c.3-.3.7-.5 1.1-.7l.4-1.6Z"></path>
-                <circle cx="8" cy="7" r="2"></circle>
+                <path d="M2.5 3.5v3h3"></path>
+                <path d="M3 7a5.5 5.5 0 1 0 1.1-3.3L2.5 5"></path>
+                <path d="M8 4.5V8l2.5 1.5"></path>
               </svg>
             </button>
-            <div class="pb-input" contenteditable="plaintext-only" role="textbox" aria-multiline="true" aria-label="Message" data-placeholder="Ask about these components..."></div>
-            <button class="pb-deictic-toggle" type="button" aria-pressed="true" aria-label="Toggle deictic mode" title="Toggle deictic mode">
+            <div class="pb-input" contenteditable="plaintext-only" role="textbox" aria-multiline="true" aria-label="Message" data-placeholder="Type your message here..."></div>
+            <button class="pb-new-chat pb-composer-new-chat" type="button" aria-label="New chat" title="New chat">
               <svg aria-hidden="true" viewBox="0 0 16 16">
-                <path d="m6.4 9.6 3.2-3.2M5.1 11.9l-1 1a2.5 2.5 0 0 1-3.5-3.5l3-3a2.5 2.5 0 0 1 3.5 0M10.9 4.1l1-1a2.5 2.5 0 0 1 3.5 3.5l-3 3a2.5 2.5 0 0 1-3.5 0"></path>
+                <path d="m10.8 2.2 3 3-7.6 7.6-3.8.8.8-3.8 7.6-7.6ZM9.2 3.8l3 3M2.5 2.5v3M1 4h3"></path>
               </svg>
             </button>
             <button class="pb-send" type="submit" aria-label="Send message" title="Send message" disabled>↑</button>
@@ -121,6 +147,10 @@ export default defineContentScript({
     const settingsForm = root.querySelector<HTMLFormElement>(".pb-settings-form")!;
     const settingsCloseButton = root.querySelector<HTMLButtonElement>(".pb-settings-close")!;
     const settingsCancelButton = root.querySelector<HTMLButtonElement>(".pb-settings-cancel")!;
+    const historyButton = root.querySelector<HTMLButtonElement>(".pb-history")!;
+    const historyPane = root.querySelector<HTMLElement>(".pb-history-pane")!;
+    const historyCloseButton = root.querySelector<HTMLButtonElement>(".pb-history-close")!;
+    const newChatButtons = [...root.querySelectorAll<HTMLButtonElement>(".pb-new-chat")]!
     const bridgeAddressInput = root.querySelector<HTMLInputElement>(".pb-agent-bridge-address")!;
     const projectDirectoryInput = root.querySelector<HTMLInputElement>(".pb-project-directory")!;
     const input = root.querySelector<HTMLElement>(".pb-input")!;
@@ -275,20 +305,6 @@ export default defineContentScript({
         }),
       );
       updateDeicticAvailability();
-    }
-
-    function setSettingsOpen(isOpen: boolean) {
-      settingsPane.hidden = !isOpen;
-      messages.hidden = isOpen;
-      form.hidden = isOpen;
-      settingsButton.setAttribute("aria-expanded", String(isOpen));
-      if (isOpen) bridgeAddressInput.focus();
-    }
-
-    async function loadSettings() {
-      const settings = await browser.storage.local.get(["agentBridgeAddress", "projectDirectory"]);
-      bridgeAddressInput.value = settings.agentBridgeAddress ?? "";
-      projectDirectoryInput.value = settings.projectDirectory ?? "";
     }
 
     function getDraft() {
@@ -730,20 +746,41 @@ export default defineContentScript({
     panelHeader.addEventListener("pointerup", stopPanelDrag);
     panelHeader.addEventListener("pointercancel", stopPanelDrag);
 
-    cancelButton.addEventListener("click", cancelSelection);
-    settingsButton.addEventListener("click", () => setSettingsOpen(settingsPane.hidden));
-    settingsCloseButton.addEventListener("click", () => setSettingsOpen(false));
-    settingsCancelButton.addEventListener("click", () => setSettingsOpen(false));
-    settingsForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      void browser.storage.local
-        .set({
-          agentBridgeAddress: bridgeAddressInput.value.trim(),
-          projectDirectory: projectDirectoryInput.value.trim(),
-        })
-        .then(() => setSettingsOpen(false));
+    const settings = createSettingsController({
+      composer: form,
+      messages,
+      settingsButton,
+      settingsPane,
+      settingsForm,
+      closeButton: settingsCloseButton,
+      cancelButton: settingsCancelButton,
+      bridgeAddressInput,
+      projectDirectoryInput,
     });
-    void loadSettings();
+
+    const history = createHistoryController(
+      {
+        composer: form,
+        messages,
+        historyButton,
+        historyPane,
+        closeButton: historyCloseButton,
+        newChatButtons,
+      },
+      {
+        onNewChat: () => {
+          deicticReferences = [];
+          activeDeicticReferenceId = null;
+          input.replaceChildren();
+          hideDeicticTooltip();
+          renderEmptyState();
+          updateSendButton();
+          input.focus();
+        },
+      },
+    );
+
+    cancelButton.addEventListener("click", cancelSelection);
     selectComponentsButton.addEventListener("click", () => {
       if (isSelecting && selectionMode === "add") {
         stopSelecting();
@@ -755,12 +792,14 @@ export default defineContentScript({
       setTheme(!panel.classList.contains("pb-dark"));
     });
     closeButton.addEventListener("click", () => {
-      setSettingsOpen(false);
+      settings.close();
+      history.close();
       panel.hidden = true;
       clearSelection();
     });
 
     deicticToggle.addEventListener("click", () => {
+      settings.close();
       deicticMode = !deicticMode;
       deicticToggle.setAttribute("aria-pressed", String(deicticMode));
       if (deicticMode) {
