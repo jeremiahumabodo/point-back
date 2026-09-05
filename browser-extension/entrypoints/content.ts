@@ -1,11 +1,14 @@
 import "../assets/content.css";
 import { sendMessageToAgentBridge } from "../agent-bridge/message-client";
+import type { ThreadDetail } from "../../shared/conversation.ts";
 import { resolveComponent } from "../component-resolution/resolve-component";
 import type { ComponentFootprint } from "../component-resolution/types";
 import { createHistoryController } from "../history/history-controller";
 import { createSettingsController } from "../settings/settings-controller";
 
-type PointBackMessage = { type: "pointback:start-selection" | "pointback:open-panel" };
+type PointBackMessage = {
+  type: "pointback:start-selection" | "pointback:open-panel";
+};
 type SelectionMode = "initial" | "add" | "replace" | "link";
 
 type DeicticReference = {
@@ -18,10 +21,12 @@ type DeicticReference = {
 
 type StructuredMessage = {
   content: string;
-  references: Array<Omit<DeicticReference, "targets"> & {
-    components: ComponentFootprint[];
-    targets: Element[];
-  }>;
+  references: Array<
+    Omit<DeicticReference, "targets"> & {
+      components: ComponentFootprint[];
+      targets: Element[];
+    }
+  >;
 };
 
 export default defineContentScript({
@@ -90,8 +95,9 @@ export default defineContentScript({
               <input class="pb-agent-bridge-address" type="url" inputmode="url" placeholder="http://127.0.0.1:3000" autocomplete="off" required>
             </label>
             <label class="pb-settings-field">
-              <span>Project directory</span>
-              <input class="pb-project-directory" type="text" placeholder="C:\\path\\to\\project" autocomplete="off" required>
+              <span>Bridge token</span>
+              <input class="pb-bridge-token" type="password" placeholder="Paste from bridge terminal; blank keeps saved token" autocomplete="off">
+              <small>The repository is configured locally when starting the bridge. Agent access is read-only.</small>
             </label>
             <button class="pb-deictic-toggle pb-deictic-settings-toggle" type="button" aria-pressed="true" aria-label="Toggle component references" title="Toggle component references">
               <span>Reference UI components</span>
@@ -131,6 +137,7 @@ export default defineContentScript({
                 <path d="m10.8 2.2 3 3-7.6 7.6-3.8.8.8-3.8 7.6-7.6ZM9.2 3.8l3 3M2.5 2.5v3M1 4h3"></path>
               </svg>
             </button>
+            <button class="pb-stop" type="button" hidden>Stop</button>
             <button class="pb-send" type="submit" aria-label="Send message" title="Send message" disabled>
               <svg class="pb-direction-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 13V3M4.5 6.5 8 3l3.5 3.5"></path></svg>
             </button>
@@ -142,37 +149,74 @@ export default defineContentScript({
     document.documentElement.append(root);
 
     const hint = root.querySelector<HTMLElement>(".pb-selection-hint")!;
-    const selectionInstruction = root.querySelector<HTMLElement>(".pb-selection-instruction")!;
-    const cancelButton = root.querySelector<HTMLButtonElement>(".pb-cancel-selection")!;
+    const selectionInstruction = root.querySelector<HTMLElement>(
+      ".pb-selection-instruction",
+    )!;
+    const cancelButton = root.querySelector<HTMLButtonElement>(
+      ".pb-cancel-selection",
+    )!;
     const lasso = root.querySelector<HTMLElement>(".pb-lasso")!;
-    const selectedHighlights = root.querySelector<HTMLElement>(".pb-selected-highlights")!;
-    const replacementHighlight = root.querySelector<HTMLElement>(".pb-replacement-highlight")!;
-    const deicticTargetHighlights = root.querySelector<HTMLElement>(".pb-deictic-target-highlights")!;
+    const selectedHighlights = root.querySelector<HTMLElement>(
+      ".pb-selected-highlights",
+    )!;
+    const replacementHighlight = root.querySelector<HTMLElement>(
+      ".pb-replacement-highlight",
+    )!;
+    const deicticTargetHighlights = root.querySelector<HTMLElement>(
+      ".pb-deictic-target-highlights",
+    )!;
     const panel = root.querySelector<HTMLElement>(".pb-panel")!;
     const panelHeader = root.querySelector<HTMLElement>(".pb-header")!;
-    const selectComponentsButton = root.querySelector<HTMLButtonElement>(".pb-select-components")!;
-    const themeToggle = root.querySelector<HTMLButtonElement>(".pb-theme-toggle")!;
+    const selectComponentsButton = root.querySelector<HTMLButtonElement>(
+      ".pb-select-components",
+    )!;
+    const themeToggle =
+      root.querySelector<HTMLButtonElement>(".pb-theme-toggle")!;
     const closeButton = root.querySelector<HTMLButtonElement>(".pb-close")!;
-    const componentName = root.querySelector<HTMLElement>(".pb-component-name")!;
-    const componentList = root.querySelector<HTMLElement>(".pb-component-list")!;
+    const componentName =
+      root.querySelector<HTMLElement>(".pb-component-name")!;
+    const componentList =
+      root.querySelector<HTMLElement>(".pb-component-list")!;
     const messages = root.querySelector<HTMLElement>(".pb-messages")!;
     const form = root.querySelector<HTMLFormElement>(".pb-composer")!;
-    const settingsButton = root.querySelector<HTMLButtonElement>(".pb-settings")!;
+    const settingsButton =
+      root.querySelector<HTMLButtonElement>(".pb-settings")!;
     const settingsPane = root.querySelector<HTMLElement>(".pb-settings-pane")!;
-    const settingsForm = root.querySelector<HTMLFormElement>(".pb-settings-form")!;
-    const settingsCloseButton = root.querySelector<HTMLButtonElement>(".pb-settings-close")!;
-    const settingsCancelButton = root.querySelector<HTMLButtonElement>(".pb-settings-cancel")!;
+    const settingsForm =
+      root.querySelector<HTMLFormElement>(".pb-settings-form")!;
+    const settingsCloseButton =
+      root.querySelector<HTMLButtonElement>(".pb-settings-close")!;
+    const settingsCancelButton = root.querySelector<HTMLButtonElement>(
+      ".pb-settings-cancel",
+    )!;
     const historyButton = root.querySelector<HTMLButtonElement>(".pb-history")!;
     const historyPane = root.querySelector<HTMLElement>(".pb-history-pane")!;
-    const historyCloseButton = root.querySelector<HTMLButtonElement>(".pb-history-close")!;
-    const newChatButtons = [...root.querySelectorAll<HTMLButtonElement>(".pb-new-chat")]!
-    const bridgeAddressInput = root.querySelector<HTMLInputElement>(".pb-agent-bridge-address")!;
-    const projectDirectoryInput = root.querySelector<HTMLInputElement>(".pb-project-directory")!;
+    const historyCloseButton =
+      root.querySelector<HTMLButtonElement>(".pb-history-close")!;
+    const newChatButtons = [
+      ...root.querySelectorAll<HTMLButtonElement>(".pb-new-chat"),
+    ]!;
+    const bridgeAddressInput = root.querySelector<HTMLInputElement>(
+      ".pb-agent-bridge-address",
+    )!;
+    const bridgeTokenInput =
+      root.querySelector<HTMLInputElement>(".pb-bridge-token")!;
     const input = root.querySelector<HTMLElement>(".pb-input")!;
-    const deicticToggle = root.querySelector<HTMLButtonElement>(".pb-deictic-toggle")!;
-    const deicticTooltip = root.querySelector<HTMLElement>(".pb-deictic-tooltip")!;
-    const componentDetailsPopover = root.querySelector<HTMLElement>(".pb-component-details-popover")!;
+    const deicticToggle =
+      root.querySelector<HTMLButtonElement>(".pb-deictic-toggle")!;
+    const deicticTooltip = root.querySelector<HTMLElement>(
+      ".pb-deictic-tooltip",
+    )!;
+    const componentDetailsPopover = root.querySelector<HTMLElement>(
+      ".pb-component-details-popover",
+    )!;
     const sendButton = root.querySelector<HTMLButtonElement>(".pb-send")!;
+    const stopButton = root.querySelector<HTMLButtonElement>(".pb-stop")!;
+    let threadId: string | undefined;
+    let isSending = false;
+    let cancelResponse: (() => void) | undefined;
+    let savedComponents: ComponentFootprint[] = [];
+    stopButton.addEventListener("click", () => cancelResponse?.());
 
     const selectedElements = new Set<Element>();
     let highlightedElement: Element | null = null;
@@ -190,8 +234,10 @@ export default defineContentScript({
     let linkReferenceId: string | null = null;
     let nextDeicticReferenceId = 1;
     const componentByChip = new WeakMap<HTMLElement, Element>();
-    let inspectedComponent: { element: Element; anchor: HTMLElement } | null = null;
-    let hoveredComponent: { element: Element; anchor: HTMLElement } | null = null;
+    let inspectedComponent: { element: Element; anchor: HTMLElement } | null =
+      null;
+    let hoveredComponent: { element: Element; anchor: HTMLElement } | null =
+      null;
     let isInspectModifierHeld = false;
     const deicticWords = new Set(["this", "that", "these", "those", "here"]);
 
@@ -217,7 +263,10 @@ export default defineContentScript({
       const anchorRect = anchor.getBoundingClientRect();
       const margin = 8;
       const popoverRect = componentDetailsPopover.getBoundingClientRect();
-      const left = Math.min(Math.max(margin, anchorRect.left), window.innerWidth - popoverRect.width - margin);
+      const left = Math.min(
+        Math.max(margin, anchorRect.left),
+        window.innerWidth - popoverRect.width - margin,
+      );
       const top = anchorRect.bottom + margin;
       const pointerLeft = Math.min(
         Math.max(12, anchorRect.left + anchorRect.width / 2 - left),
@@ -226,7 +275,10 @@ export default defineContentScript({
 
       componentDetailsPopover.style.left = `${left}px`;
       componentDetailsPopover.style.top = `${top}px`;
-      componentDetailsPopover.style.setProperty("--pb-popover-pointer-left", `${pointerLeft}px`);
+      componentDetailsPopover.style.setProperty(
+        "--pb-popover-pointer-left",
+        `${pointerLeft}px`,
+      );
     }
 
     function showComponentDetails(element: Element, anchor: HTMLElement) {
@@ -241,15 +293,48 @@ export default defineContentScript({
         ["page", `${footprint.page.origin}${footprint.page.path}`],
         ["selector", footprint.selector],
         ["DOM path", footprint.domPath.join(" > ")],
-        ...(footprint.react ? [["React component", footprint.react.component.name] as [string, string]] : []),
-        ...(sourceLocation ? [["source", sourceLocation] as [string, string]] : []),
-        ...(footprint.react?.ancestry.length ? [["React ancestry", footprint.react.ancestry.map((component) => component.name).join(" ← ")] as [string, string]] : []),
+        ...(footprint.react
+          ? [
+              ["React component", footprint.react.component.name] as [
+                string,
+                string,
+              ],
+            ]
+          : []),
+        ...(sourceLocation
+          ? [["source", sourceLocation] as [string, string]]
+          : []),
+        ...(footprint.react?.ancestry.length
+          ? [
+              [
+                "React ancestry",
+                footprint.react.ancestry
+                  .map((component) => component.name)
+                  .join(" ← "),
+              ] as [string, string],
+            ]
+          : []),
         ...(footprint.id ? [["id", footprint.id] as [string, string]] : []),
-        ...(footprint.componentName ? [["data-component-name", footprint.componentName] as [string, string]] : []),
-        ...(footprint.testId ? [["data-testid", footprint.testId] as [string, string]] : []),
-        ...(footprint.ariaLabel ? [["aria-label", footprint.ariaLabel] as [string, string]] : []),
-        ...(footprint.role ? [["role", footprint.role] as [string, string]] : []),
-        ...(footprint.textExcerpt ? [["text", footprint.textExcerpt] as [string, string]] : []),
+        ...(footprint.componentName
+          ? [
+              ["data-component-name", footprint.componentName] as [
+                string,
+                string,
+              ],
+            ]
+          : []),
+        ...(footprint.testId
+          ? [["data-testid", footprint.testId] as [string, string]]
+          : []),
+        ...(footprint.ariaLabel
+          ? [["aria-label", footprint.ariaLabel] as [string, string]]
+          : []),
+        ...(footprint.role
+          ? [["role", footprint.role] as [string, string]]
+          : []),
+        ...(footprint.textExcerpt
+          ? [["text", footprint.textExcerpt] as [string, string]]
+          : []),
       ];
       const title = document.createElement("strong");
       title.className = "pb-component-details-title";
@@ -313,7 +398,9 @@ export default defineContentScript({
     }
 
     function refreshDeicticTargetHighlights() {
-      const reference = deicticReferences.find((item) => item.id === highlightedDeicticReferenceId);
+      const reference = deicticReferences.find(
+        (item) => item.id === highlightedDeicticReferenceId,
+      );
       if (reference) showDeicticTargetHighlights(reference.targets);
       else hideDeicticTargetHighlights();
     }
@@ -366,14 +453,18 @@ export default defineContentScript({
           componentByChip.set(chip, element);
           chip.textContent = tagName;
           chip.setAttribute("aria-label", `Replace ${tagName}`);
-          chip.setAttribute("aria-pressed", String(element === replacementElement));
+          chip.setAttribute(
+            "aria-pressed",
+            String(element === replacementElement),
+          );
           chip.title = `Replace ${tagName}. Hold Ctrl or ⌘ to inspect resolved attributes.`;
           chip.addEventListener("pointerenter", (event) => {
             hoveredComponent = { element, anchor: chip };
             removeHighlight();
             highlightedElement = element;
             element.classList.add("pointback-highlight");
-            if (isInspectModifierHeld || event.ctrlKey || event.metaKey) showComponentDetails(element, chip);
+            if (isInspectModifierHeld || event.ctrlKey || event.metaKey)
+              showComponentDetails(element, chip);
           });
           chip.addEventListener("pointerleave", () => {
             if (hoveredComponent?.anchor === chip) hoveredComponent = null;
@@ -404,7 +495,9 @@ export default defineContentScript({
           removeButton.textContent = "−";
           removeButton.setAttribute("aria-label", `Remove ${name}`);
           removeButton.title = `Remove ${name}`;
-          removeButton.addEventListener("click", () => removeComponent(element));
+          removeButton.addEventListener("click", () =>
+            removeComponent(element),
+          );
 
           tag.append(chip, removeButton);
           return tag;
@@ -418,17 +511,22 @@ export default defineContentScript({
     }
 
     function getDeicticReferenceCandidates(text: string) {
-      const references: Array<Pick<DeicticReference, "term" | "start" | "end">> = [];
+      const references: Array<
+        Pick<DeicticReference, "term" | "start" | "end">
+      > = [];
       for (const match of text.matchAll(/[a-z]+/gi)) {
         const term = match[0].toLowerCase();
         const start = match.index ?? 0;
-        if (deicticWords.has(term)) references.push({ term, start, end: start + match[0].length });
+        if (deicticWords.has(term))
+          references.push({ term, start, end: start + match[0].length });
       }
       return references;
     }
 
     function getRenderedDeicticReferences() {
-      return [...input.querySelectorAll<HTMLElement>(".pb-deictic-reference")].map((token) => {
+      return [
+        ...input.querySelectorAll<HTMLElement>(".pb-deictic-reference"),
+      ].map((token) => {
         const range = document.createRange();
         range.selectNodeContents(input);
         range.setEndBefore(token);
@@ -436,43 +534,63 @@ export default defineContentScript({
         before.append(range.cloneContents());
         const start = (before.textContent ?? "").replace(/\r/g, "").length;
         const term = token.dataset.term ?? "";
-        return { id: token.dataset.referenceId ?? "", term, start, end: start + term.length };
+        return {
+          id: token.dataset.referenceId ?? "",
+          term,
+          start,
+          end: start + term.length,
+        };
       });
     }
 
     function syncDeicticReferences(text: string) {
-      const referencesById = new Map(deicticReferences.map((reference) => [reference.id, reference]));
+      const referencesById = new Map(
+        deicticReferences.map((reference) => [reference.id, reference]),
+      );
       const renderedReferences = getRenderedDeicticReferences();
       const matchedReferenceIds = new Set<string>();
       let newestReferenceId: string | null = null;
-      deicticReferences = getDeicticReferenceCandidates(text).map((candidate) => {
-        const renderedReference = renderedReferences.find(
-          (reference) =>
-            !matchedReferenceIds.has(reference.id) &&
-            reference.term === candidate.term &&
-            reference.start === candidate.start &&
-            reference.end === candidate.end,
-        );
-        const existing = renderedReference ? referencesById.get(renderedReference.id) : undefined;
-        if (existing && renderedReference) {
-          matchedReferenceIds.add(renderedReference.id);
-          return { ...existing, ...candidate };
-        }
+      deicticReferences = getDeicticReferenceCandidates(text).map(
+        (candidate) => {
+          const renderedReference = renderedReferences.find(
+            (reference) =>
+              !matchedReferenceIds.has(reference.id) &&
+              reference.term === candidate.term &&
+              reference.start === candidate.start &&
+              reference.end === candidate.end,
+          );
+          const existing = renderedReference
+            ? referencesById.get(renderedReference.id)
+            : undefined;
+          if (existing && renderedReference) {
+            matchedReferenceIds.add(renderedReference.id);
+            return { ...existing, ...candidate };
+          }
 
-        const reference = { ...candidate, id: `reference-${nextDeicticReferenceId++}`, targets: [] };
-        newestReferenceId = reference.id;
-        return reference;
-      });
+          const reference = {
+            ...candidate,
+            id: `reference-${nextDeicticReferenceId++}`,
+            targets: [],
+          };
+          newestReferenceId = reference.id;
+          return reference;
+        },
+      );
 
       const removedReferences = [...referencesById.values()].filter(
         (reference) => !matchedReferenceIds.has(reference.id),
       );
       if (removedReferences.length > 0) {
-        const targetsStillReferenced = new Set(deicticReferences.flatMap((reference) => reference.targets));
+        const targetsStillReferenced = new Set(
+          deicticReferences.flatMap((reference) => reference.targets),
+        );
         for (const removedReference of removedReferences) {
           for (const target of removedReference.targets) {
             if (targetsStillReferenced.has(target)) continue;
-            target.classList.remove("pointback-selected", "pointback-highlight");
+            target.classList.remove(
+              "pointback-selected",
+              "pointback-highlight",
+            );
             selectedElements.delete(target);
           }
         }
@@ -481,7 +599,11 @@ export default defineContentScript({
       }
 
       if (newestReferenceId) activeDeicticReferenceId = newestReferenceId;
-      if (!deicticReferences.some((reference) => reference.id === activeDeicticReferenceId)) {
+      if (
+        !deicticReferences.some(
+          (reference) => reference.id === activeDeicticReferenceId,
+        )
+      ) {
         activeDeicticReferenceId = deicticReferences.at(-1)?.id ?? null;
       }
       return newestReferenceId;
@@ -515,14 +637,24 @@ export default defineContentScript({
       return beforeCaret.toString().length;
     }
 
-    function restoreCaret(offset: number, textNodes: Array<{ node: Text; start: number; end: number }>, tokens: Array<{ element: HTMLElement; reference: DeicticReference }>) {
+    function restoreCaret(
+      offset: number,
+      textNodes: Array<{ node: Text; start: number; end: number }>,
+      tokens: Array<{ element: HTMLElement; reference: DeicticReference }>,
+    ) {
       const range = document.createRange();
-      const textNode = textNodes.find(({ start, end }) => offset >= start && offset <= end);
+      const textNode = textNodes.find(
+        ({ start, end }) => offset >= start && offset <= end,
+      );
       if (textNode) {
         range.setStart(textNode.node, offset - textNode.start);
       } else {
-        const token = tokens.find(({ reference }) => offset >= reference.start && offset <= reference.end);
-        if (token && offset <= token.reference.start) range.setStartBefore(token.element);
+        const token = tokens.find(
+          ({ reference }) =>
+            offset >= reference.start && offset <= reference.end,
+        );
+        if (token && offset <= token.reference.start)
+          range.setStartBefore(token.element);
         else if (token) range.setStartAfter(token.element);
         else range.selectNodeContents(input);
       }
@@ -535,23 +667,34 @@ export default defineContentScript({
 
     function setActiveDeicticReference(reference: DeicticReference) {
       activeDeicticReferenceId = reference.id;
-      input.querySelectorAll<HTMLElement>(".pb-deictic-reference").forEach((token) => {
-        token.classList.toggle("pb-deictic-reference-active", token.dataset.referenceId === reference.id);
-      });
+      input
+        .querySelectorAll<HTMLElement>(".pb-deictic-reference")
+        .forEach((token) => {
+          token.classList.toggle(
+            "pb-deictic-reference-active",
+            token.dataset.referenceId === reference.id,
+          );
+        });
     }
 
     function isPluralDeictic(reference: DeicticReference) {
       return reference.term === "these" || reference.term === "those";
     }
 
-    function linkComponentToReference(reference: DeicticReference, component: Element) {
+    function linkComponentToReference(
+      reference: DeicticReference,
+      component: Element,
+    ) {
       if (!selectedElements.has(component)) addToSelection(component);
       if (isPluralDeictic(reference)) {
-        if (!reference.targets.includes(component)) reference.targets.push(component);
+        if (!reference.targets.includes(component))
+          reference.targets.push(component);
       } else {
         reference.targets = [component];
       }
-      input.querySelector<HTMLElement>(`[data-reference-id="${reference.id}"]`)?.classList.add("pb-deictic-reference-linked");
+      input
+        .querySelector<HTMLElement>(`[data-reference-id="${reference.id}"]`)
+        ?.classList.add("pb-deictic-reference-linked");
       updateSelectionHeader();
       updateSendButton();
     }
@@ -559,12 +702,16 @@ export default defineContentScript({
     function decorateDeicticReferences() {
       if (!deicticMode) return;
 
-      const caretOffset = document.activeElement === input ? getCaretOffset() : null;
+      const caretOffset =
+        document.activeElement === input ? getCaretOffset() : null;
       const text = getDraft();
       const newestReferenceId = syncDeicticReferences(text);
       const fragment = document.createDocumentFragment();
       const textNodes: Array<{ node: Text; start: number; end: number }> = [];
-      const tokens: Array<{ element: HTMLElement; reference: DeicticReference }> = [];
+      const tokens: Array<{
+        element: HTMLElement;
+        reference: DeicticReference;
+      }> = [];
       let cursor = 0;
       for (const reference of deicticReferences) {
         const before = text.slice(cursor, reference.start);
@@ -575,8 +722,14 @@ export default defineContentScript({
         }
         const token = document.createElement("span");
         token.className = "pb-deictic-reference";
-        token.classList.toggle("pb-deictic-reference-active", reference.id === activeDeicticReferenceId);
-        token.classList.toggle("pb-deictic-reference-linked", reference.targets.length > 0);
+        token.classList.toggle(
+          "pb-deictic-reference-active",
+          reference.id === activeDeicticReferenceId,
+        );
+        token.classList.toggle(
+          "pb-deictic-reference-linked",
+          reference.targets.length > 0,
+        );
         token.contentEditable = "false";
         token.dataset.term = reference.term;
         token.dataset.referenceId = reference.id;
@@ -615,13 +768,25 @@ export default defineContentScript({
     }
 
     function updateSendButton() {
-      sendButton.disabled = !getDraft().trim();
+      sendButton.disabled = isSending || !getDraft().trim();
+      stopButton.hidden = !isSending;
+      historyButton.disabled = isSending;
+      settingsButton.disabled = isSending;
+      selectComponentsButton.disabled = isSending;
+      deicticToggle.disabled = isSending;
+      for (const button of componentList.querySelectorAll<HTMLButtonElement>(
+        "button",
+      ))
+        button.disabled = isSending;
+      for (const button of newChatButtons) button.disabled = isSending;
     }
 
     function updateDeicticAvailability() {
       const currentSelections = new Set(selectedElements);
       deicticReferences.forEach((reference) => {
-        reference.targets = reference.targets.filter((target) => currentSelections.has(target));
+        reference.targets = reference.targets.filter((target) =>
+          currentSelections.has(target),
+        );
       });
       updateSendButton();
     }
@@ -680,16 +845,16 @@ export default defineContentScript({
       stopSelecting();
       clearSelection();
       updateSelectionHeader();
-      renderEmptyState();
+      if (!messages.children.length) renderEmptyState();
       panel.hidden = false;
-      input.contentEditable = "plaintext-only";
+      input.contentEditable = isSending ? "false" : "plaintext-only";
       updateSendButton();
     }
 
     function openPanel(resetMessages: boolean) {
       if (selectedElements.size === 0) return;
       updateSelectionHeader();
-      if (resetMessages) renderEmptyState();
+      if (resetMessages && !threadId && !isSending) renderEmptyState();
       else refreshEmptyState();
       panel.hidden = false;
       input.contentEditable = "plaintext-only";
@@ -710,7 +875,10 @@ export default defineContentScript({
       hint.hidden = true;
       hint.classList.remove("pb-cursor-hint");
       cancelButton.hidden = false;
-      document.documentElement.classList.remove("pointback-selecting", "pointback-link-singular");
+      document.documentElement.classList.remove(
+        "pointback-selecting",
+        "pointback-link-singular",
+      );
       updateSelectionHeader();
     }
 
@@ -731,11 +899,19 @@ export default defineContentScript({
       replacementElement = replacement;
       linkReferenceId = linkReference;
       isAddModeActive = mode === "add";
-      selectComponentsButton.setAttribute("aria-pressed", String(isAddModeActive));
+      selectComponentsButton.setAttribute(
+        "aria-pressed",
+        String(isAddModeActive),
+      );
       updateSelectionHeader();
       const isLinkSelection = mode === "link";
-      const linkedReference = deicticReferences.find((reference) => reference.id === linkReferenceId);
-      const isSingularLink = isLinkSelection && !!linkedReference && !isPluralDeictic(linkedReference);
+      const linkedReference = deicticReferences.find(
+        (reference) => reference.id === linkReferenceId,
+      );
+      const isSingularLink =
+        isLinkSelection &&
+        !!linkedReference &&
+        !isPluralDeictic(linkedReference);
       hint.classList.toggle("pb-cursor-hint", isLinkSelection);
       cancelButton.hidden = isLinkSelection;
       selectionInstruction.textContent =
@@ -749,7 +925,10 @@ export default defineContentScript({
       isSelecting = true;
       hint.hidden = false;
       document.documentElement.classList.add("pointback-selecting");
-      document.documentElement.classList.toggle("pointback-link-singular", isSingularLink);
+      document.documentElement.classList.toggle(
+        "pointback-link-singular",
+        isSingularLink,
+      );
     }
 
     function cancelSelection() {
@@ -757,21 +936,28 @@ export default defineContentScript({
       stopSelecting();
     }
 
-    function appendMessage(message: StructuredMessage) {
+    function appendMessage(message: StructuredMessage, createdAt?: string) {
       const bubble = document.createElement("article");
       bubble.className = "pb-message pb-user";
 
       const body = document.createElement("p");
       body.className = "pb-message-content";
       let cursor = 0;
-      for (const reference of [...message.references].sort((left, right) => left.start - right.start)) {
+      for (const reference of [...message.references].sort(
+        (left, right) => left.start - right.start,
+      )) {
         body.append(message.content.slice(cursor, reference.start));
 
         const token = document.createElement("span");
         token.className = "pb-deictic-reference pb-deictic-reference-linked";
-        token.textContent = message.content.slice(reference.start, reference.end);
+        token.textContent = message.content.slice(
+          reference.start,
+          reference.end,
+        );
         token.title = "Hover to highlight linked component(s)";
-        token.addEventListener("pointerenter", () => showDeicticTargetHighlights(reference.targets));
+        token.addEventListener("pointerenter", () =>
+          showDeicticTargetHighlights(reference.targets),
+        );
         token.addEventListener("pointerleave", hideDeicticTargetHighlights);
         body.append(token);
         cursor = reference.end;
@@ -780,13 +966,64 @@ export default defineContentScript({
 
       const metadata = document.createElement("div");
       metadata.className = "pb-message-metadata";
-      const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date());
+      const time = new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(createdAt ? new Date(createdAt) : new Date());
       metadata.textContent = `You · ${time}${message.references.length ? ` · ${message.references.length} reference${message.references.length === 1 ? "" : "s"}` : ""}`;
 
       bubble.append(body, metadata);
       messages.querySelector(".pb-empty-state")?.remove();
       messages.append(bubble);
       messages.scrollTop = messages.scrollHeight;
+      return metadata;
+    }
+
+    function appendAssistant() {
+      const bubble = document.createElement("article");
+      bubble.className = "pb-message pb-assistant";
+      const body = document.createElement("p");
+      body.className = "pb-message-content";
+      const status = document.createElement("div");
+      status.className = "pb-message-metadata";
+      status.textContent = "Assistant · Waiting for bridge…";
+      bubble.append(body, status);
+      messages.append(bubble);
+      return { body, status };
+    }
+
+    function openSavedThread(thread: ThreadDetail) {
+      stopSelecting();
+      clearSelection();
+      threadId = thread.id;
+      savedComponents =
+        thread.messages.find((message) => message.role === "user")?.context
+          .selectedComponents ?? [];
+      deicticReferences = [];
+      activeDeicticReferenceId = null;
+      input.replaceChildren();
+      hideDeicticTooltip();
+      updateSelectionHeader();
+      componentName.textContent = thread.title;
+      messages.replaceChildren();
+      for (const message of thread.messages) {
+        if (message.role === "user") {
+          // Saved references remain evidence, not live DOM identities after reload.
+          appendMessage(
+            { content: message.content, references: [] },
+            message.createdAt,
+          );
+        } else {
+          const assistant = appendAssistant();
+          assistant.body.textContent = message.content;
+          assistant.status.textContent =
+            message.error ||
+            (message.status === "running"
+              ? "Response is active in another tab. Reopen history to refresh."
+              : "Assistant");
+        }
+      }
+      updateSendButton();
     }
 
     function updateLasso(x: number, y: number) {
@@ -812,7 +1049,14 @@ export default defineContentScript({
       return [...candidates].filter((element) => {
         if (isPointBackUi(element)) return false;
         const rect = element.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 && rect.left < right && rect.right > left && rect.top < bottom && rect.bottom > top;
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.left < right &&
+          rect.right > left &&
+          rect.top < bottom &&
+          rect.bottom > top
+        );
       });
     }
 
@@ -824,10 +1068,17 @@ export default defineContentScript({
     }
 
     panelHeader.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || event.target instanceof Element && event.target.closest("button")) return;
+      if (
+        event.button !== 0 ||
+        (event.target instanceof Element && event.target.closest("button"))
+      )
+        return;
 
       const rect = panel.getBoundingClientRect();
-      panelDrag = { offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
+      panelDrag = {
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+      };
       panelHeader.setPointerCapture(event.pointerId);
       panel.classList.add("pb-panel-dragging");
     });
@@ -837,8 +1088,14 @@ export default defineContentScript({
 
       const width = panel.offsetWidth;
       const height = panel.offsetHeight;
-      const left = Math.min(Math.max(0, event.clientX - panelDrag.offsetX), window.innerWidth - width);
-      const top = Math.min(Math.max(0, event.clientY - panelDrag.offsetY), window.innerHeight - height);
+      const left = Math.min(
+        Math.max(0, event.clientX - panelDrag.offsetX),
+        window.innerWidth - width,
+      );
+      const top = Math.min(
+        Math.max(0, event.clientY - panelDrag.offsetY),
+        window.innerHeight - height,
+      );
       panel.style.left = `${left}px`;
       panel.style.top = `${top}px`;
       panel.style.right = "auto";
@@ -862,7 +1119,7 @@ export default defineContentScript({
       closeButton: settingsCloseButton,
       cancelButton: settingsCancelButton,
       bridgeAddressInput,
-      projectDirectoryInput,
+      bridgeTokenInput,
     });
 
     const history = createHistoryController(
@@ -875,7 +1132,14 @@ export default defineContentScript({
         newChatButtons,
       },
       {
+        isBusy: () => isSending,
+        onOpenThread: openSavedThread,
         onNewChat: () => {
+          threadId = undefined;
+          savedComponents = [];
+          stopSelecting();
+          clearSelection();
+          updateSelectionHeader();
           deicticReferences = [];
           activeDeicticReferenceId = null;
           input.replaceChildren();
@@ -938,7 +1202,7 @@ export default defineContentScript({
       const draft = getDraft();
       const content = draft.trim();
       const leadingWhitespaceLength = draft.length - draft.trimStart().length;
-      if (!content) return;
+      if (!content || isSending) return;
 
       const message: StructuredMessage = {
         content,
@@ -955,28 +1219,83 @@ export default defineContentScript({
               }))
           : [],
       };
-      appendMessage(message);
-      void sendMessageToAgentBridge({
-        message: {
-          content: message.content,
-          references: message.references.map(({ targets: _targets, ...reference }) => reference),
-        },
-        context: {
-          selectedComponents: [...selectedElements].map(createComponentFootprint),
-        },
-      });
+      const metadata = appendMessage(message);
+      const assistant = appendAssistant();
+      const components = selectedElements.size
+        ? [...selectedElements].map(createComponentFootprint)
+        : savedComponents;
+      let accepted = false;
+      isSending = true;
       stopSelecting();
-      deicticReferences = [];
-      input.replaceChildren();
-      hideDeicticTooltip();
-      activeDeicticReferenceId = null;
+      input.contentEditable = "false";
       updateSendButton();
+      const finish = () => {
+        isSending = false;
+        cancelResponse = undefined;
+        input.contentEditable = "plaintext-only";
+        updateSendButton();
+      };
+      try {
+        const stream = sendMessageToAgentBridge(
+          {
+            requestId: crypto.randomUUID(),
+            ...(threadId ? { threadId } : {}),
+            message: {
+              content: message.content,
+              references: message.references.map(
+                ({ targets: _targets, ...reference }) => reference,
+              ),
+            },
+            context: { selectedComponents: components },
+          },
+          (event) => {
+            if (event.type === "accepted") {
+              accepted = true;
+              threadId = event.threadId;
+              savedComponents = components;
+              deicticReferences = [];
+              input.replaceChildren();
+              hideDeicticTooltip();
+              activeDeicticReferenceId = null;
+            }
+            if (event.type === "status")
+              assistant.status.textContent = event.message;
+            if (event.type === "assistant")
+              assistant.body.textContent = event.content;
+            if (event.type === "completed") {
+              assistant.status.textContent = "Assistant";
+              finish();
+            }
+            if (event.type === "failed") {
+              assistant.status.textContent = event.message;
+              if (!accepted)
+                metadata.textContent +=
+                  " · Delivery unconfirmed — draft retained";
+              finish();
+            }
+            messages.scrollTop = messages.scrollHeight;
+          },
+        );
+        cancelResponse = stream.cancel;
+      } catch (error) {
+        assistant.status.textContent =
+          error instanceof Error
+            ? error.message
+            : "Could not connect to bridge.";
+        metadata.textContent += " · Not sent";
+        finish();
+      }
     });
 
     document.addEventListener(
       "pointerdown",
       (event) => {
-        if (!isSelecting || !(event.target instanceof Element) || isPointBackUi(event.target)) return;
+        if (
+          !isSelecting ||
+          !(event.target instanceof Element) ||
+          isPointBackUi(event.target)
+        )
+          return;
         lassoStart = { x: event.clientX, y: event.clientY };
         lasso.hidden = false;
         updateLasso(event.clientX, event.clientY);
@@ -987,7 +1306,12 @@ export default defineContentScript({
     document.addEventListener(
       "pointermove",
       (event) => {
-        if (!isSelecting || !(event.target instanceof Element) || isPointBackUi(event.target)) return;
+        if (
+          !isSelecting ||
+          !(event.target instanceof Element) ||
+          isPointBackUi(event.target)
+        )
+          return;
         if (selectionMode === "link") {
           hint.style.left = `${event.clientX + 14}px`;
           hint.style.top = `${event.clientY + 14}px`;
@@ -1004,21 +1328,39 @@ export default defineContentScript({
     document.addEventListener(
       "pointerup",
       (event) => {
-        if (!isSelecting || !(event.target instanceof Element) || isPointBackUi(event.target) || !lassoStart) return;
-        const moved = Math.hypot(event.clientX - lassoStart.x, event.clientY - lassoStart.y) > 6;
+        if (
+          !isSelecting ||
+          !(event.target instanceof Element) ||
+          isPointBackUi(event.target) ||
+          !lassoStart
+        )
+          return;
+        const moved =
+          Math.hypot(
+            event.clientX - lassoStart.x,
+            event.clientY - lassoStart.y,
+          ) > 6;
         event.preventDefault();
         event.stopPropagation();
         suppressNextClick = true;
 
         const mode = selectionMode;
-        const linkReference = mode === "link"
-          ? deicticReferences.find((reference) => reference.id === linkReferenceId)
-          : undefined;
-        const pickedComponents = moved ? getLassoedComponents(event.clientX, event.clientY) : [event.target];
+        const linkReference =
+          mode === "link"
+            ? deicticReferences.find(
+                (reference) => reference.id === linkReferenceId,
+              )
+            : undefined;
+        const pickedComponents = moved
+          ? getLassoedComponents(event.clientX, event.clientY)
+          : [event.target];
 
         if (mode === "link" && linkReference) {
-          const componentsToLink = isPluralDeictic(linkReference) ? pickedComponents : pickedComponents.slice(0, 1);
-          for (const component of componentsToLink) linkComponentToReference(linkReference, component);
+          const componentsToLink = isPluralDeictic(linkReference)
+            ? pickedComponents
+            : pickedComponents.slice(0, 1);
+          for (const component of componentsToLink)
+            linkComponentToReference(linkReference, component);
         } else if (mode === "replace") {
           if (pickedComponents[0]) replaceSelection(pickedComponents[0]);
         } else {
@@ -1026,7 +1368,11 @@ export default defineContentScript({
           for (const component of pickedComponents) addToSelection(component);
         }
 
-        const keepSelecting = mode === "add" || (mode === "link" && !!linkReference && isPluralDeictic(linkReference));
+        const keepSelecting =
+          mode === "add" ||
+          (mode === "link" &&
+            !!linkReference &&
+            isPluralDeictic(linkReference));
         if (keepSelecting) {
           lassoStart = null;
           lasso.hidden = true;
@@ -1050,55 +1396,81 @@ export default defineContentScript({
       true,
     );
 
-    window.addEventListener("scroll", () => {
-      renderSelectedHighlights();
-      refreshDeicticTargetHighlights();
-      if (replacementElement) showReplacementHighlight(replacementElement);
-      if (inspectedComponent) positionComponentDetails(inspectedComponent.anchor);
-    }, true);
+    window.addEventListener(
+      "scroll",
+      () => {
+        renderSelectedHighlights();
+        refreshDeicticTargetHighlights();
+        if (replacementElement) showReplacementHighlight(replacementElement);
+        if (inspectedComponent)
+          positionComponentDetails(inspectedComponent.anchor);
+      },
+      true,
+    );
     window.addEventListener("resize", () => {
       renderSelectedHighlights();
       refreshDeicticTargetHighlights();
       if (replacementElement) showReplacementHighlight(replacementElement);
-      if (inspectedComponent) positionComponentDetails(inspectedComponent.anchor);
+      if (inspectedComponent)
+        positionComponentDetails(inspectedComponent.anchor);
     });
 
-    window.addEventListener("keydown", (event) => {
-      if (event.key === "Control" || event.key === "Meta") {
-        isInspectModifierHeld = true;
-        if (hoveredComponent) {
-          showComponentDetails(hoveredComponent.element, hoveredComponent.anchor);
-        } else {
-          const activeElement = document.activeElement;
-          const focusedChip = activeElement instanceof HTMLElement && activeElement.classList.contains("pb-component-chip")
-            ? activeElement
-            : null;
-          const component = focusedChip ? componentByChip.get(focusedChip) : undefined;
-          if (component && focusedChip) {
-            showComponentDetails(component, focusedChip);
-          } else if (selectedElements.size === 1) {
-            const chip = componentList.querySelector<HTMLElement>(".pb-component-chip");
-            const selectedComponent = chip ? componentByChip.get(chip) : undefined;
-            if (chip && selectedComponent) showComponentDetails(selectedComponent, chip);
+    window.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Control" || event.key === "Meta") {
+          isInspectModifierHeld = true;
+          if (hoveredComponent) {
+            showComponentDetails(
+              hoveredComponent.element,
+              hoveredComponent.anchor,
+            );
+          } else {
+            const activeElement = document.activeElement;
+            const focusedChip =
+              activeElement instanceof HTMLElement &&
+              activeElement.classList.contains("pb-component-chip")
+                ? activeElement
+                : null;
+            const component = focusedChip
+              ? componentByChip.get(focusedChip)
+              : undefined;
+            if (component && focusedChip) {
+              showComponentDetails(component, focusedChip);
+            } else if (selectedElements.size === 1) {
+              const chip =
+                componentList.querySelector<HTMLElement>(".pb-component-chip");
+              const selectedComponent = chip
+                ? componentByChip.get(chip)
+                : undefined;
+              if (chip && selectedComponent)
+                showComponentDetails(selectedComponent, chip);
+            }
           }
         }
-      }
-      if (event.key === "Escape" && isSelecting) cancelSelection();
-    }, true);
+        if (event.key === "Escape" && isSelecting) cancelSelection();
+      },
+      true,
+    );
 
-    window.addEventListener("keyup", (event) => {
-      if (event.key !== "Control" && event.key !== "Meta") return;
-      isInspectModifierHeld = false;
-      hideComponentDetails();
-    }, true);
+    window.addEventListener(
+      "keyup",
+      (event) => {
+        if (event.key !== "Control" && event.key !== "Meta") return;
+        isInspectModifierHeld = false;
+        hideComponentDetails();
+      },
+      true,
+    );
 
     document.addEventListener(
       "pointermove",
       (event) => {
         if (!event.ctrlKey && !event.metaKey) return;
-        const chip = event.target instanceof Element
-          ? event.target.closest<HTMLElement>(".pb-component-chip")
-          : null;
+        const chip =
+          event.target instanceof Element
+            ? event.target.closest<HTMLElement>(".pb-component-chip")
+            : null;
         const component = chip ? componentByChip.get(chip) : undefined;
         if (chip && component) showComponentDetails(component, chip);
       },

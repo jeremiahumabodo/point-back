@@ -27,9 +27,12 @@ function resolveReactComponent(element: Element): ReactResolution | undefined {
 
   window.addEventListener(REACT_RESOLUTION_RESPONSE, onResponse);
   element.setAttribute(REACT_RESOLUTION_ATTRIBUTE, requestId);
-  window.dispatchEvent(new CustomEvent(REACT_RESOLUTION_REQUEST, { detail: requestId }));
+  window.dispatchEvent(
+    new CustomEvent(REACT_RESOLUTION_REQUEST, { detail: requestId }),
+  );
   window.removeEventListener(REACT_RESOLUTION_RESPONSE, onResponse);
-  if (previousValue === null) element.removeAttribute(REACT_RESOLUTION_ATTRIBUTE);
+  if (previousValue === null)
+    element.removeAttribute(REACT_RESOLUTION_ATTRIBUTE);
   else element.setAttribute(REACT_RESOLUTION_ATTRIBUTE, previousValue);
 
   return resolution;
@@ -43,5 +46,7 @@ function resolveReactComponent(element: Element): ReactResolution | undefined {
 export function resolveComponent(element: Element): ComponentFootprint {
   const domFootprint = resolveDomComponent(element);
   const react = resolveReactComponent(element);
-  return react ? { ...domFootprint, name: react.component.name, react } : domFootprint;
+  return react
+    ? { ...domFootprint, name: react.component.name, react }
+    : domFootprint;
 }

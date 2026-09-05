@@ -8,6 +8,7 @@ export default defineConfig({
       default_title: "Activate PointBack",
     },
     name: "PointBack",
-    description: "Start coding-agent conversations from the UI you are inspecting.",
+    description:
+      "Start coding-agent conversations from the UI you are inspecting.",
   },
 });

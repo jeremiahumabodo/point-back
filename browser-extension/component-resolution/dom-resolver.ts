@@ -12,9 +12,12 @@ function selectorPart(element: Element): string {
   if (testId) return `${tagName}[data-testid="${CSS.escape(testId)}"]`;
 
   const componentName = element.getAttribute("data-component-name");
-  if (componentName) return `${tagName}[data-component-name="${CSS.escape(componentName)}"]`;
+  if (componentName)
+    return `${tagName}[data-component-name="${CSS.escape(componentName)}"]`;
 
-  const siblings = Array.from(element.parentElement?.children ?? []).filter((sibling) => sibling.tagName === element.tagName);
+  const siblings = Array.from(element.parentElement?.children ?? []).filter(
+    (sibling) => sibling.tagName === element.tagName,
+  );
   const position = siblings.indexOf(element) + 1;
   return siblings.length > 1 ? `${tagName}:nth-of-type(${position})` : tagName;
 }
@@ -30,11 +33,19 @@ function getDomPath(element: Element): Element[] {
 }
 
 function getTextExcerpt(element: Element): string | undefined {
-  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) {
+  if (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement
+  ) {
     return undefined;
   }
 
-  const text = (element instanceof HTMLElement ? element.innerText : element.textContent ?? "")
+  const text = (
+    element instanceof HTMLElement
+      ? element.innerText
+      : (element.textContent ?? "")
+  )
     .replace(/\s+/g, " ")
     .trim();
   return text ? text.slice(0, MAX_TEXT_LENGTH) : undefined;
