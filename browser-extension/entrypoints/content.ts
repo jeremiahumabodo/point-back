@@ -59,6 +59,13 @@ export default defineContentScript({
               </svg>
             </button>
             <button class="pb-theme-toggle" type="button" role="switch" aria-label="Dark mode" aria-checked="false" title="Toggle dark mode">
+              <svg class="pb-theme-toggle-moon" aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M10.8 2.2a5.6 5.6 0 1 0 3 10.1A5.8 5.8 0 0 1 10.8 2.2Z"></path>
+              </svg>
+              <svg class="pb-theme-toggle-sun" aria-hidden="true" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="2.5"></circle>
+                <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M12.6 3.4l-1 1M4.4 11.6l-1 1"></path>
+              </svg>
               <span class="pb-theme-toggle-thumb" aria-hidden="true"></span>
             </button>
             <button class="pb-close" type="button" aria-label="Close conversation" title="Close conversation">×</button>
@@ -422,6 +429,7 @@ export default defineContentScript({
       }
       range.collapse(true);
       const selection = window.getSelection();
+      input.focus({ preventScroll: true });
       selection?.removeAllRanges();
       selection?.addRange(range);
     }
