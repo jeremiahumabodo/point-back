@@ -1,4 +1,7 @@
 {
+	"scripts": {
+		"start": "node index.ts"
+	},
 	"dependencies": {
 		"fastify": "^5.12.1",
 		"typescript": "^7.0.2"

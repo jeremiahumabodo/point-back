@@ -1,4 +1,5 @@
 import "../assets/content.css";
+import { sendMessageToAgentBridge } from "../agent-bridge/message-client";
 import { resolveComponent } from "../component-resolution/resolve-component";
 import type { ComponentFootprint } from "../component-resolution/types";
 import { createHistoryController } from "../history/history-controller";
@@ -68,14 +69,18 @@ export default defineContentScript({
               </svg>
               <span class="pb-theme-toggle-thumb" aria-hidden="true"></span>
             </button>
-            <button class="pb-close" type="button" aria-label="Close conversation" title="Close conversation">×</button>
+            <button class="pb-close" type="button" aria-label="Close conversation" title="Close conversation">
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="m4 4 8 8M12 4l-8 8"></path>
+              </svg>
+            </button>
           </div>
         </header>
         <div class="pb-messages" aria-live="polite"></div>
         <section id="pb-settings-pane" class="pb-settings-pane" aria-labelledby="pb-settings-title" hidden>
           <div class="pb-settings-pane-header">
             <button class="pb-settings-close" type="button" aria-label="Back to conversation" title="Back to conversation">
-              <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 3 4.5 8l5 5M5 8h7"></path></svg>
+              <svg class="pb-direction-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 13V3M4.5 6.5 8 3l3.5 3.5"></path></svg>
             </button>
             <h3 id="pb-settings-title">Connection Settings</h3>
           </div>
@@ -103,7 +108,7 @@ export default defineContentScript({
         <section id="pb-history-pane" class="pb-history-pane" aria-labelledby="pb-history-title" hidden>
           <div class="pb-settings-pane-header">
             <button class="pb-history-close" type="button" aria-label="Back to conversation" title="Back to conversation">
-              <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 3 4.5 8l5 5M5 8h7"></path></svg>
+              <svg class="pb-direction-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 13V3M4.5 6.5 8 3l3.5 3.5"></path></svg>
             </button>
             <h3 id="pb-history-title">Chat History</h3>
           </div>
@@ -126,10 +131,13 @@ export default defineContentScript({
                 <path d="m10.8 2.2 3 3-7.6 7.6-3.8.8.8-3.8 7.6-7.6ZM9.2 3.8l3 3M2.5 2.5v3M1 4h3"></path>
               </svg>
             </button>
-            <button class="pb-send" type="submit" aria-label="Send message" title="Send message" disabled>↑</button>
+            <button class="pb-send" type="submit" aria-label="Send message" title="Send message" disabled>
+              <svg class="pb-direction-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 13V3M4.5 6.5 8 3l3.5 3.5"></path></svg>
+            </button>
           </div>
         </form>
       </aside>
+      <div class="pb-component-details-popover" role="tooltip" hidden></div>
     `;
     document.documentElement.append(root);
 
@@ -163,6 +171,7 @@ export default defineContentScript({
     const input = root.querySelector<HTMLElement>(".pb-input")!;
     const deicticToggle = root.querySelector<HTMLButtonElement>(".pb-deictic-toggle")!;
     const deicticTooltip = root.querySelector<HTMLElement>(".pb-deictic-tooltip")!;
+    const componentDetailsPopover = root.querySelector<HTMLElement>(".pb-component-details-popover")!;
     const sendButton = root.querySelector<HTMLButtonElement>(".pb-send")!;
 
     const selectedElements = new Set<Element>();
@@ -180,6 +189,10 @@ export default defineContentScript({
     let highlightedDeicticReferenceId: string | null = null;
     let linkReferenceId: string | null = null;
     let nextDeicticReferenceId = 1;
+    const componentByChip = new WeakMap<HTMLElement, Element>();
+    let inspectedComponent: { element: Element; anchor: HTMLElement } | null = null;
+    let hoveredComponent: { element: Element; anchor: HTMLElement } | null = null;
+    let isInspectModifierHeld = false;
     const deicticWords = new Set(["this", "that", "these", "those", "here"]);
 
     function isPointBackUi(element: Element) {
@@ -188,6 +201,76 @@ export default defineContentScript({
 
     function getComponentName(element: Element): string {
       return resolveComponent(element).name;
+    }
+
+    function getComponentTagName(element: Element): string {
+      return `<${resolveComponent(element).tagName}>`;
+    }
+
+    function hideComponentDetails() {
+      inspectedComponent = null;
+      componentDetailsPopover.hidden = true;
+      componentDetailsPopover.replaceChildren();
+    }
+
+    function positionComponentDetails(anchor: HTMLElement) {
+      const anchorRect = anchor.getBoundingClientRect();
+      const margin = 8;
+      const popoverRect = componentDetailsPopover.getBoundingClientRect();
+      const left = Math.min(Math.max(margin, anchorRect.left), window.innerWidth - popoverRect.width - margin);
+      const top = anchorRect.bottom + margin;
+      const pointerLeft = Math.min(
+        Math.max(12, anchorRect.left + anchorRect.width / 2 - left),
+        popoverRect.width - 12,
+      );
+
+      componentDetailsPopover.style.left = `${left}px`;
+      componentDetailsPopover.style.top = `${top}px`;
+      componentDetailsPopover.style.setProperty("--pb-popover-pointer-left", `${pointerLeft}px`);
+    }
+
+    function showComponentDetails(element: Element, anchor: HTMLElement) {
+      const footprint = resolveComponent(element);
+      const source = footprint.react?.component.source;
+      const sourceLocation = source
+        ? `${source.fileName}${source.lineNumber ? `:${source.lineNumber}${source.columnNumber ? `:${source.columnNumber}` : ""}` : ""}`
+        : undefined;
+      const attributes: Array<[string, string]> = [
+        ["tagName", `<${footprint.tagName}>`],
+        ["name", footprint.name],
+        ["page", `${footprint.page.origin}${footprint.page.path}`],
+        ["selector", footprint.selector],
+        ["DOM path", footprint.domPath.join(" > ")],
+        ...(footprint.react ? [["React component", footprint.react.component.name] as [string, string]] : []),
+        ...(sourceLocation ? [["source", sourceLocation] as [string, string]] : []),
+        ...(footprint.react?.ancestry.length ? [["React ancestry", footprint.react.ancestry.map((component) => component.name).join(" ← ")] as [string, string]] : []),
+        ...(footprint.id ? [["id", footprint.id] as [string, string]] : []),
+        ...(footprint.componentName ? [["data-component-name", footprint.componentName] as [string, string]] : []),
+        ...(footprint.testId ? [["data-testid", footprint.testId] as [string, string]] : []),
+        ...(footprint.ariaLabel ? [["aria-label", footprint.ariaLabel] as [string, string]] : []),
+        ...(footprint.role ? [["role", footprint.role] as [string, string]] : []),
+        ...(footprint.textExcerpt ? [["text", footprint.textExcerpt] as [string, string]] : []),
+      ];
+      const title = document.createElement("strong");
+      title.className = "pb-component-details-title";
+      title.textContent = "Resolved attributes";
+      const list = document.createElement("dl");
+      list.className = "pb-component-details-list";
+      list.replaceChildren(
+        ...attributes.map(([name, value]) => {
+          const row = document.createElement("div");
+          const label = document.createElement("dt");
+          label.textContent = name;
+          const content = document.createElement("dd");
+          content.textContent = value;
+          row.append(label, content);
+          return row;
+        }),
+      );
+      componentDetailsPopover.replaceChildren(title, list);
+      componentDetailsPopover.hidden = false;
+      inspectedComponent = { element, anchor };
+      positionComponentDetails(anchor);
     }
 
     function removeHighlight() {
@@ -266,27 +349,43 @@ export default defineContentScript({
     }
 
     function updateSelectionHeader() {
+      hideComponentDetails();
+      hoveredComponent = null;
       const elements = [...selectedElements];
-      componentName.textContent = `${elements.length} component${elements.length === 1 ? "" : "s"} selected`;
+      componentName.textContent = `${elements.length} Component${elements.length === 1 ? "" : "s"} selected`;
       componentList.replaceChildren(
         ...elements.map((element) => {
           const name = getComponentName(element);
+          const tagName = getComponentTagName(element);
           const tag = document.createElement("span");
           tag.className = "pb-component-tag";
 
           const chip = document.createElement("button");
           chip.className = "pb-component-chip";
           chip.type = "button";
-          chip.textContent = name;
-          chip.setAttribute("aria-label", `Replace ${name}`);
+          componentByChip.set(chip, element);
+          chip.textContent = tagName;
+          chip.setAttribute("aria-label", `Replace ${tagName}`);
           chip.setAttribute("aria-pressed", String(element === replacementElement));
-          chip.title = `Replace ${name}`;
-          chip.addEventListener("pointerenter", () => {
+          chip.title = `Replace ${tagName}. Hold Ctrl or ⌘ to inspect resolved attributes.`;
+          chip.addEventListener("pointerenter", (event) => {
+            hoveredComponent = { element, anchor: chip };
             removeHighlight();
             highlightedElement = element;
             element.classList.add("pointback-highlight");
+            if (isInspectModifierHeld || event.ctrlKey || event.metaKey) showComponentDetails(element, chip);
           });
-          chip.addEventListener("pointerleave", removeHighlight);
+          chip.addEventListener("pointerleave", () => {
+            if (hoveredComponent?.anchor === chip) hoveredComponent = null;
+            if (inspectedComponent?.anchor === chip) hideComponentDetails();
+            removeHighlight();
+          });
+          chip.addEventListener("focus", () => {
+            if (isInspectModifierHeld) showComponentDetails(element, chip);
+          });
+          chip.addEventListener("blur", () => {
+            if (inspectedComponent?.anchor === chip) hideComponentDetails();
+          });
           chip.addEventListener("click", () => {
             startSelecting("replace", element);
             highlightedElement = element;
@@ -857,6 +956,15 @@ export default defineContentScript({
           : [],
       };
       appendMessage(message);
+      void sendMessageToAgentBridge({
+        message: {
+          content: message.content,
+          references: message.references.map(({ targets: _targets, ...reference }) => reference),
+        },
+        context: {
+          selectedComponents: [...selectedElements].map(createComponentFootprint),
+        },
+      });
       stopSelecting();
       deicticReferences = [];
       input.replaceChildren();
@@ -946,15 +1054,60 @@ export default defineContentScript({
       renderSelectedHighlights();
       refreshDeicticTargetHighlights();
       if (replacementElement) showReplacementHighlight(replacementElement);
+      if (inspectedComponent) positionComponentDetails(inspectedComponent.anchor);
     }, true);
     window.addEventListener("resize", () => {
       renderSelectedHighlights();
       refreshDeicticTargetHighlights();
       if (replacementElement) showReplacementHighlight(replacementElement);
+      if (inspectedComponent) positionComponentDetails(inspectedComponent.anchor);
     });
 
-    document.addEventListener("keydown", (event) => {
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Control" || event.key === "Meta") {
+        isInspectModifierHeld = true;
+        if (hoveredComponent) {
+          showComponentDetails(hoveredComponent.element, hoveredComponent.anchor);
+        } else {
+          const activeElement = document.activeElement;
+          const focusedChip = activeElement instanceof HTMLElement && activeElement.classList.contains("pb-component-chip")
+            ? activeElement
+            : null;
+          const component = focusedChip ? componentByChip.get(focusedChip) : undefined;
+          if (component && focusedChip) {
+            showComponentDetails(component, focusedChip);
+          } else if (selectedElements.size === 1) {
+            const chip = componentList.querySelector<HTMLElement>(".pb-component-chip");
+            const selectedComponent = chip ? componentByChip.get(chip) : undefined;
+            if (chip && selectedComponent) showComponentDetails(selectedComponent, chip);
+          }
+        }
+      }
       if (event.key === "Escape" && isSelecting) cancelSelection();
+    }, true);
+
+    window.addEventListener("keyup", (event) => {
+      if (event.key !== "Control" && event.key !== "Meta") return;
+      isInspectModifierHeld = false;
+      hideComponentDetails();
+    }, true);
+
+    document.addEventListener(
+      "pointermove",
+      (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        const chip = event.target instanceof Element
+          ? event.target.closest<HTMLElement>(".pb-component-chip")
+          : null;
+        const component = chip ? componentByChip.get(chip) : undefined;
+        if (chip && component) showComponentDetails(component, chip);
+      },
+      true,
+    );
+
+    window.addEventListener("blur", () => {
+      isInspectModifierHeld = false;
+      hideComponentDetails();
     });
 
     browser.runtime.onMessage.addListener((message: PointBackMessage) => {

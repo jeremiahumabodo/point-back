@@ -7,6 +7,15 @@ const meta = {
   parameters: {
     layout: "centered",
   },
+  argTypes: {
+    componentName: {
+      control: "text",
+      description: "The UI component this thread is about.",
+    },
+    placeholder: {
+      control: "text",
+    },
+  },
   tags: ["autodocs"],
 } satisfies Meta<typeof MessagePanel>;
 
@@ -39,6 +48,40 @@ export const Default: Story = {
         timestamp: "10:43 AM",
         content:
           "I can help investigate that. Let’s start with the component’s props and state changes.",
+      },
+    ],
+  },
+};
+
+export const Interactive: Story = {
+  args: {
+    componentName: "MessageBubble",
+    messages: [],
+    onSend: () => undefined,
+  },
+};
+
+export const SelectedComponents: Story = {
+  args: {
+    componentName: "MessageBubble",
+    componentNames: ["MessageBubble", "SendButton"],
+    messages: [],
+    placeholder: "Type your message here...",
+  },
+};
+
+export const Dark: Story = {
+  args: {
+    componentName: "MessageBubble",
+    componentNames: ["MessageBubble"],
+    dark: true,
+    messages: [
+      {
+        id: "message-1",
+        role: "user",
+        author: "You",
+        timestamp: "10:42 AM",
+        content: "Why does this component rerender?",
       },
     ],
   },
