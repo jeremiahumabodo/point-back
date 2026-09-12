@@ -425,6 +425,20 @@
   cursor: pointer;
   font: inherit;
 }
+#pointback-root .pb-stop {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border-radius: 6px;
+}
+#pointback-root .pb-stop svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
 #pointback-root .pb-history-thread {
   display: block;
   width: 100%;
@@ -761,6 +775,10 @@
   gap: 0;
   padding: 0;
   border-radius: 6px;
+}
+
+#pointback-root .pb-composer-new-chat[hidden] {
+  display: none;
 }
 
 #pointback-root .pb-composer-new-chat svg {

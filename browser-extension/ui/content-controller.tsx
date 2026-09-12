@@ -626,6 +626,7 @@ export function mountContentController(
   function updateSendButton() {
     sendButton.disabled = isSending || !getDraft().trim();
     stopButton.hidden = !isSending;
+    for (const button of newChatButtons) button.hidden = isSending;
     historyButton.disabled = isSending;
     settingsButton.disabled = isSending;
     selectComponentsButton.disabled = isSending;

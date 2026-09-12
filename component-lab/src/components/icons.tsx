@@ -13,6 +13,7 @@ export type IconName =
   | "reference"
   | "send"
   | "settings"
+  | "stop"
   | "sun"
   | "moon";
 
@@ -32,6 +33,7 @@ const viewBoxes: Record<IconName, string> = {
   reference: "0 0 16 16",
   send: "0 0 16 16",
   settings: "0 0 16 16",
+  stop: "0 0 16 16",
   sun: "0 0 16 16",
   moon: "0 0 16 16",
   minus: "0 0 8 8",
@@ -92,6 +94,8 @@ function iconContent(name: IconName): ReactNode {
           <circle cx="8" cy="7" r="2" />
         </>
       );
+    case "stop":
+      return <rect x="4" y="4" width="8" height="8" rx="1" />;
     case "sun":
       return (
         <>

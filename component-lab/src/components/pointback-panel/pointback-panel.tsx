@@ -192,6 +192,7 @@ export function PointBackPanel({
             aria-label="New chat"
             title="New chat"
             onClick={onNewChat}
+            hidden={busy}
             disabled={busy}
           >
             <Icon name="new-chat" />
@@ -199,10 +200,12 @@ export function PointBackPanel({
           <button
             className="pb-stop"
             type="button"
+            aria-label="Stop response"
+            title="Stop response"
             hidden={!busy}
             onClick={onStop}
           >
-            Stop
+            <Icon name="stop" />
           </button>
           <SendButton type="submit" disabled={busy || !canSend} />
         </div>
