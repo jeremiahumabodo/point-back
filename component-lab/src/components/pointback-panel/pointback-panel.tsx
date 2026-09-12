@@ -143,15 +143,25 @@ export function PointBackPanel({
         </div>
       </header>
       <div
-        className="pb-messages"
-        aria-live="polite"
+        className="pb-message-scroll"
         hidden={pane !== "conversation"}
       >
-        {children === undefined ? (
-          <EmptyConversation selectedCount={componentNames.length} />
-        ) : (
-          children
-        )}
+        <div
+          className="pb-messages"
+          aria-live="polite"
+          hidden={pane !== "conversation"}
+        >
+          {children === undefined ? (
+            <EmptyConversation selectedCount={componentNames.length} />
+          ) : (
+            children
+          )}
+        </div>
+        <div className="pb-scrollbar" aria-hidden="true">
+          <div className="pb-scrollbar-track">
+            <div className="pb-scrollbar-thumb" />
+          </div>
+        </div>
       </div>
       <SettingsPane
         hidden={pane !== "settings"}
@@ -182,10 +192,17 @@ export function PointBackPanel({
           >
             <Icon name="history" />
           </button>
-          <ReferenceEditor
-            contentEditable={busy ? "false" : "plaintext-only"}
-            {...editorProps}
-          />
+          <div className="pb-input-scroll">
+            <ReferenceEditor
+              contentEditable={busy ? "false" : "plaintext-only"}
+              {...editorProps}
+            />
+            <div className="pb-scrollbar" aria-hidden="true">
+              <div className="pb-scrollbar-track">
+                <div className="pb-scrollbar-thumb" />
+              </div>
+            </div>
+          </div>
           <button
             className="pb-new-chat pb-composer-new-chat"
             type="button"

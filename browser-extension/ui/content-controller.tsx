@@ -100,6 +100,8 @@ export function mountContentController(
   const componentName = root.querySelector<HTMLElement>(".pb-component-name")!;
   const componentList = root.querySelector<HTMLElement>(".pb-component-list")!;
   const messages = root.querySelector<HTMLElement>(".pb-messages")!;
+  const messageScroll = root.querySelector<HTMLElement>(".pb-message-scroll")!;
+  const inputScroll = root.querySelector<HTMLElement>(".pb-input-scroll")!;
   const form = root.querySelector<HTMLFormElement>(".pb-composer")!;
   const settingsButton = root.querySelector<HTMLButtonElement>(".pb-settings")!;
   const settingsPane = root.querySelector<HTMLElement>(".pb-settings-pane")!;
@@ -136,6 +138,75 @@ export function mountContentController(
   let threadId: string | undefined;
   let isSending = false;
   let cancelResponse: (() => void) | undefined;
+  function setupCustomScrollbar(scrollElement: HTMLElement, scrollShell: HTMLElement) {
+    const scrollbar = scrollShell.querySelector<HTMLElement>(".pb-scrollbar")!;
+    const scrollbarTrack = scrollShell.querySelector<HTMLElement>(".pb-scrollbar-track")!;
+    const scrollbarThumb = scrollShell.querySelector<HTMLElement>(".pb-scrollbar-thumb")!;
+    let dragStart: { y: number; scrollTop: number } | null = null;
+    const update = () => {
+      const trackHeight = scrollbarTrack.clientHeight;
+      const viewportHeight = scrollElement.clientHeight;
+      const scrollHeight = scrollElement.scrollHeight;
+      if (!trackHeight || !scrollHeight || scrollHeight <= viewportHeight + 1) {
+        scrollShell.classList.add("pb-scrollbar-no-scroll");
+        return;
+      }
+      scrollShell.classList.remove("pb-scrollbar-no-scroll");
+      const thumbHeight = Math.max(18, (viewportHeight / scrollHeight) * trackHeight);
+      const maxTop = trackHeight - thumbHeight;
+      const maxScrollTop = scrollHeight - viewportHeight;
+      scrollbarThumb.style.height = `${thumbHeight}px`;
+      scrollbarThumb.style.top = `${maxScrollTop ? (scrollElement.scrollTop / maxScrollTop) * maxTop : 0}px`;
+    };
+    const show = () => {
+      scrollbar.classList.add("is-active");
+      window.setTimeout(() => {
+        if (!dragStart && !scrollShell.matches(":hover")) scrollbar.classList.remove("is-active");
+      }, 900);
+    };
+    const updatePointerProximity = (event: PointerEvent) => {
+      const rect = scrollShell.getBoundingClientRect();
+      const nearScrollbar =
+        event.clientX >= rect.right - 50 &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom;
+      scrollbar.classList.toggle("is-near", nearScrollbar);
+    };
+    const stopDrag = () => {
+      dragStart = null;
+      scrollbarThumb.classList.remove("is-dragging");
+      show();
+    };
+    scrollShell.addEventListener("pointermove", updatePointerProximity, { signal: lifetime.signal });
+    scrollShell.addEventListener("pointerleave", () => {
+      scrollbar.classList.remove("is-near");
+    }, { signal: lifetime.signal });
+    scrollElement.addEventListener("scroll", () => { update(); show(); }, { signal: lifetime.signal });
+    scrollbarThumb.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      dragStart = { y: event.clientY, scrollTop: scrollElement.scrollTop };
+      scrollbarThumb.classList.add("is-dragging");
+      scrollbar.classList.add("is-active");
+      scrollbarThumb.setPointerCapture(event.pointerId);
+    }, { signal: lifetime.signal });
+    scrollbarThumb.addEventListener("pointermove", (event) => {
+      if (!dragStart) return;
+      const maxScrollTop = scrollElement.scrollHeight - scrollElement.clientHeight;
+      const maxThumbTop = scrollbarTrack.clientHeight - scrollbarThumb.offsetHeight;
+      if (maxThumbTop > 0) scrollElement.scrollTop = dragStart.scrollTop + ((event.clientY - dragStart.y) / maxThumbTop) * maxScrollTop;
+    }, { signal: lifetime.signal });
+    scrollbarThumb.addEventListener("pointerup", stopDrag, { signal: lifetime.signal });
+    scrollbarThumb.addEventListener("pointercancel", stopDrag, { signal: lifetime.signal });
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(scrollElement);
+    const mutationObserver = new MutationObserver(update);
+    mutationObserver.observe(scrollElement, { childList: true, subtree: true, characterData: true });
+    update();
+    return () => { resizeObserver.disconnect(); mutationObserver.disconnect(); };
+  }
+  const messageScrollbarCleanup = setupCustomScrollbar(messages, messageScroll);
+  const inputScrollbarCleanup = setupCustomScrollbar(input, inputScroll);
   let savedComponents: ComponentFootprint[] = [];
   stopButton.addEventListener("click", () => cancelResponse?.());
 
@@ -1335,6 +1406,8 @@ export function mountContentController(
   return () => {
     disposed = true;
     lifetime.abort();
+    messageScrollbarCleanup();
+    inputScrollbarCleanup();
     browser.runtime.onMessage.removeListener(onMessage);
     history.dispose();
     cancelResponse?.();

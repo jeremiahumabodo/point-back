@@ -362,6 +362,19 @@
   display: none;
 }
 
+#pointback-root .pb-message-scroll {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+#pointback-root .pb-input-scroll {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
 #pointback-root .pb-messages {
   display: flex;
   flex: 1;
@@ -370,6 +383,73 @@
   min-height: 0;
   padding: 16px;
   overflow-y: auto;
+  scrollbar-width: none;
+}
+
+#pointback-root .pb-messages::-webkit-scrollbar {
+  display: none;
+}
+
+#pointback-root .pb-input,
+#pointback-root .pb-reference-tags {
+  scrollbar-width: none;
+}
+
+#pointback-root .pb-input::-webkit-scrollbar,
+#pointback-root .pb-reference-tags::-webkit-scrollbar {
+  display: none;
+}
+
+#pointback-root .pb-scrollbar {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  bottom: 8px;
+  width: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+#pointback-root .pb-message-scroll:hover .pb-scrollbar,
+#pointback-root .pb-input-scroll:hover .pb-scrollbar,
+#pointback-root .pb-scrollbar.is-active {
+  opacity: 1;
+}
+
+#pointback-root .pb-message-scroll.pb-scrollbar-no-scroll .pb-scrollbar,
+#pointback-root .pb-input-scroll.pb-scrollbar-no-scroll .pb-scrollbar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#pointback-root .pb-scrollbar-track {
+  position: absolute;
+  inset: 0 3px;
+}
+
+#pointback-root .pb-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  min-height: 18px;
+  background: var(--pb-border);
+  border-radius: 999px;
+  pointer-events: auto;
+  transition:
+    width 120ms ease,
+    background-color 120ms ease;
+}
+
+#pointback-root .pb-scrollbar-thumb:hover,
+#pointback-root .pb-scrollbar-thumb.is-dragging {
+  width: 4px;
+  background: var(--pb-text-muted);
+}
+
+#pointback-root .pb-scrollbar.is-near .pb-scrollbar-thumb {
+  width: 8px;
+  background: var(--pb-text-muted);
 }
 
 #pointback-root .pb-empty-state {
@@ -817,7 +897,6 @@
   min-width: 0;
   padding: 2px 0 4px;
   overflow-x: auto;
-  scrollbar-width: thin;
 }
 
 #pointback-root .pb-reference-component-tag {
