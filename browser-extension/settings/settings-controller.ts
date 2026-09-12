@@ -11,9 +11,9 @@ type SettingsControllerElements = {
 };
 
 export function createSettingsController(elements: SettingsControllerElements) {
-  const status = document.createElement("p");
-  status.setAttribute("role", "status");
-  elements.settingsForm.append(status);
+  const status = elements.settingsForm.querySelector<HTMLElement>(
+    ".pb-settings-status",
+  )!;
   const setOpen = (isOpen: boolean) => {
     elements.settingsPane.hidden = !isOpen;
     elements.messages.hidden = isOpen;

@@ -34,6 +34,27 @@ export function findCodex(): string {
     }
     return override;
   }
+  function findWindowsCodex(dir: string): string | undefined {
+    if (process.platform !== "win32") return undefined;
+    const packageRoot = join(dir, "node_modules", "@openai", "codex");
+    try {
+      const require = createRequire(join(packageRoot, "package.json"));
+      const platformPackage = require.resolve(
+        `@openai/codex-win32-${process.arch}/package.json`,
+      );
+      const target = process.arch === "arm64" ? "aarch64" : "x86_64";
+      const binary = join(
+        dirname(platformPackage),
+        "vendor",
+        `${target}-pc-windows-msvc`,
+        "bin",
+        "codex.exe",
+      );
+      return existsSync(binary) ? binary : undefined;
+    } catch {
+      return undefined;
+    }
+  }
   const dirs = (process.env.PATH ?? "").split(delimiter);
   for (const dir of dirs) {
     const native = join(
@@ -44,24 +65,8 @@ export function findCodex(): string {
     // npm's Windows .cmd shim needs a shell. Resolve its native package instead;
     // never interpolate project paths or prompts into cmd.exe.
     if (process.platform === "win32") {
-      const packageRoot = join(dir, "node_modules", "@openai", "codex");
-      try {
-        const require = createRequire(join(packageRoot, "package.json"));
-        const platformPackage = require.resolve(
-          `@openai/codex-win32-${process.arch}/package.json`,
-        );
-        const target = process.arch === "arm64" ? "aarch64" : "x86_64";
-        const binary = join(
-          dirname(platformPackage),
-          "vendor",
-          `${target}-pc-windows-msvc`,
-          "bin",
-          "codex.exe",
-        );
-        if (existsSync(binary)) return binary;
-      } catch {
-        /* Try another PATH entry. */
-      }
+      const windowsCodex = findWindowsCodex(dir);
+      if (windowsCodex) return windowsCodex;
     }
   }
   throw new Error(

@@ -1,23 +1,27 @@
 import type { ButtonHTMLAttributes } from "react";
-import styles from "./send-button.module.css";
-
-type SendButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">;
-
+export type SendButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children"
+>;
 export function SendButton({
-  "aria-label": ariaLabel = "Send message",
-  className,
+  className = "",
   type = "button",
   ...props
 }: SendButtonProps) {
   return (
     <button
-      aria-label={ariaLabel}
-      className={[styles.root, className].filter(Boolean).join(" ")}
+      aria-label="Send message"
+      title="Send message"
+      className={`pb-send ${className}`}
       type={type}
       {...props}
     >
-      <svg aria-hidden="true" viewBox="0 0 16 16">
-        <path d="M8 12V3M4.5 6.5 8 3l3.5 3.5" />
+      <svg
+        className="pb-direction-arrow"
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+      >
+        <path d="M8 13V3M4.5 6.5 8 3l3.5 3.5" />
       </svg>
     </button>
   );

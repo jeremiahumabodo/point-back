@@ -1,93 +1,56 @@
-import React, { useState, type HTMLAttributes, type MouseEvent, type ReactNode } from "react";
-import styles from "./message-bubble.module.css";
-
+import type { HTMLAttributes, ReactNode, Ref } from "react";
 export type MessageRole = "user" | "assistant";
-
-const dietics = new Set(["this", "that", "these", "those", "it", "here"]);
-
-export type MessageBubbleProps = HTMLAttributes<HTMLDivElement> & {
-  children: ReactNode;
+export type MessageBubbleProps = HTMLAttributes<HTMLElement> & {
+  children?: ReactNode;
   messageRole: MessageRole;
-  /** Identifies the sender, for example "You", "Codex", or another agent name. */
   author?: string;
-  /** A display-ready message time, supplied by the caller. */
-  timestamp: string;
-  dieticMode?: boolean;
+  timestamp?: string;
+  metadata?: ReactNode;
+  bodyRef?: Ref<HTMLParagraphElement>;
+  metadataRef?: Ref<HTMLDivElement>;
 };
-
 export function MessageBubble({
   children,
-  className,
+  className = "",
   messageRole,
-  author = messageRole === "user" ? "You" : "Codex",
+  author = messageRole === "user" ? "You" : "Assistant",
   timestamp,
-  dieticMode = false,
+  metadata,
+  bodyRef,
+  metadataRef,
   ...props
 }: MessageBubbleProps) {
-  const [selectedDietic, setSelectedDietic] = useState<string | null>(null);
-
-  const processedChildren = (): ReactNode => {
-    if (!dieticMode || typeof children !== "string") {
-      return children;
-    }
-
-    return children.split(/(\s+)/).map((word, index) => {
-      if (word.trim() === "") {
-        return word;
-      }
-
-      const normalizedWord = word.toLowerCase().replace(/[^a-z]/g, "");
-      const isDieticWord = normalizedWord !== "" && dietics.has(normalizedWord);
-
-      if (!isDieticWord) {
-        return word;
-      }
-
-      const dieticKey = `${index}-${normalizedWord}`;
-
-      function selectDietic(e: MouseEvent<HTMLButtonElement>): void {
-        e.preventDefault();
-        setSelectedDietic((current: string | null) => (current === dieticKey ? null : dieticKey));
-      }
-
-      return React.createElement(
-        "button",
-        {
-          key: dieticKey,
-          type: "button",
-          onClick: selectDietic,
-          style: {
-            background: "none",
-            border: "none",
-            padding: 0,
-            margin: 0,
-            color: selectedDietic === dieticKey ? "#2563eb" : "inherit",
-            textDecoration: "underline",
-            cursor: "pointer",
-          },
-          "aria-label": `Dietic word: ${normalizedWord}`,
-        },
-        word,
-      );
-    });
-  };
-
-  return React.createElement(
-    "div",
-    {
-      className: [styles.root, styles[messageRole], className].filter(Boolean).join(" "),
-      ...props,
-    },
-    React.createElement(
-      "div",
-      { className: styles.content },
-      processedChildren(),
-    ),
-    React.createElement(
-      "div",
-      { className: styles.metadata },
-      React.createElement("span", { className: styles.author }, author),
-      React.createElement("time", { className: styles.timestamp }, timestamp),
-    ),
+  return (
+    <article className={`pb-message pb-${messageRole} ${className}`} {...props}>
+      <p className="pb-message-content" ref={bodyRef}>
+        {children}
+      </p>
+      <div className="pb-message-metadata" ref={metadataRef}>
+        {metadata ?? `${author}${timestamp ? ` · ${timestamp}` : ""}`}
+      </div>
+    </article>
+  );
+}
+export function EmptyConversation({
+  selectedCount = 0,
+}: {
+  selectedCount?: number;
+}) {
+  return (
+    <div className="pb-empty-state">
+      <p className="pb-empty-title">
+        Start a conversation about{" "}
+        {selectedCount === 0
+          ? "this page"
+          : selectedCount === 1
+            ? "this component"
+            : "these components"}
+      </p>
+      <p className="pb-empty-description">
+        {selectedCount === 0
+          ? "Type a message and point to components as you refer to them."
+          : "Ask about their behavior, styling, or implementation."}
+      </p>
+    </div>
   );
 }

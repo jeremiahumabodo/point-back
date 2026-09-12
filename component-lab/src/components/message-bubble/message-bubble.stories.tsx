@@ -20,7 +20,6 @@ export const User: Story = {
     author: "You",
     timestamp: "10:42 AM",
     children: "Could you explain why this component rerenders?",
-    dieticMode: false
   },
 };
 
@@ -29,7 +28,7 @@ export const Assistant: Story = {
     messageRole: "assistant",
     author: "Codex",
     timestamp: "10:43 AM",
-    children: "I can help investigate that. Let’s start with the component’s props and state changes.",
-    dieticMode: false
+    children:
+      "I can help investigate that. Let’s start with the component’s props and state changes.",
   },
 };

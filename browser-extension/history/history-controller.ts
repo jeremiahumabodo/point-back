@@ -1,5 +1,8 @@
+import { createElement } from "react";
+import { HistoryList } from "../../component-lab/src/components/conversation-panes/conversation-panes";
 import { getThread, listThreads } from "../agent-bridge/message-client";
 import type { ThreadDetail } from "../../shared/conversation.ts";
+import type { ReactSlots } from "../ui/react-slots";
 
 type HistoryControllerElements = {
   composer: HTMLFormElement;
@@ -11,6 +14,7 @@ type HistoryControllerElements = {
 };
 
 export function createHistoryController(
+  slots: ReactSlots,
   elements: HistoryControllerElements,
   options: {
     onNewChat: () => void;
@@ -33,42 +37,45 @@ export function createHistoryController(
     setOpen(!!elements.historyPane.hidden);
     if (elements.historyPane.hidden) return;
     const current = generation;
-    list.textContent = "Loading conversations…";
+    slots.render(list, "Loading conversations…");
     try {
       const threads = await listThreads();
       if (current !== generation) return;
-      list.replaceChildren();
-      if (!threads.length)
-        list.textContent = "No saved conversations for this repository.";
-      for (const thread of threads) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "pb-history-thread";
-        button.textContent = thread.title;
-        button.title = new Date(thread.updatedAt).toLocaleString();
-        button.addEventListener("click", async () => {
-          button.disabled = true;
-          try {
-            const detail = await getThread(thread.id);
-            if (current !== generation || options.isBusy()) return;
-            options.onOpenThread(detail);
-            setOpen(false);
-          } catch (error) {
-            if (current === generation)
-              list.textContent =
-                error instanceof Error
-                  ? error.message
-                  : "Could not load conversation.";
-          } finally {
-            button.disabled = false;
-          }
-        });
-        list.append(button);
+      const render = (loadingId?: string) =>
+        slots.render(
+          list,
+          createElement(HistoryList, {
+            threads,
+            loadingId,
+            onOpen: (id: string) => {
+              void open(id);
+            },
+          }),
+        );
+      async function open(id: string) {
+        render(id);
+        try {
+          const detail = await getThread(id);
+          if (current !== generation || options.isBusy()) return;
+          options.onOpenThread(detail);
+          setOpen(false);
+        } catch (error) {
+          if (current === generation)
+            slots.render(
+              list,
+              error instanceof Error
+                ? error.message
+                : "Could not load conversation.",
+            );
+        }
       }
+      render();
     } catch (error) {
       if (current === generation)
-        list.textContent =
-          error instanceof Error ? error.message : "Could not load history.";
+        slots.render(
+          list,
+          error instanceof Error ? error.message : "Could not load history.",
+        );
     }
   });
   elements.closeButton.addEventListener("click", () => setOpen(false));
@@ -78,5 +85,10 @@ export function createHistoryController(
       setOpen(false);
       options.onNewChat();
     });
-  return { close: () => setOpen(false) };
+  return {
+    close: () => setOpen(false),
+    dispose: () => {
+      generation++;
+    },
+  };
 }

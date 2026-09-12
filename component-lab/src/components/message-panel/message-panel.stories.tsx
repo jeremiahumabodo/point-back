@@ -5,7 +5,8 @@ const meta = {
   title: "PointBack/MessagePanel",
   component: MessagePanel,
   parameters: {
-    layout: "centered",
+    layout: "fullscreen",
+    docs: { story: { inline: false, height: 580 } },
   },
   argTypes: {
     componentName: {
