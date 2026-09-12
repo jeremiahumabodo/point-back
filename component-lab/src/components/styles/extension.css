@@ -215,10 +215,16 @@
   position: absolute;
   right: -3px;
   bottom: -3px;
-  display: grid;
+  display: flex;
   width: 11px;
   height: 11px;
-  place-items: center;
+  min-width: 11px;
+  min-height: 11px;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0;
   color: var(--pb-bg);
   background: var(--pb-action);
   border: 1px solid var(--pb-bg);
@@ -235,6 +241,15 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.25;
+}
+
+#pointback-root .pb-add-indicator svg {
+  width: 7px;
+  height: 7px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
 
 #pointback-root .pb-close svg {

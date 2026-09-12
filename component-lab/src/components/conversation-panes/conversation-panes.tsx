@@ -1,12 +1,9 @@
 import type { FormHTMLAttributes, ReactNode } from "react";
 import { ReferenceButton } from "../reference-button";
+import { Icon } from "../icons";
 
 export function BackArrow() {
-  return (
-    <svg className="pb-direction-arrow" aria-hidden="true" viewBox="0 0 16 16">
-      <path d="M8 13V3M4.5 6.5 8 3l3.5 3.5" />
-    </svg>
-  );
+  return <Icon name="back-arrow" className="pb-direction-arrow" />;
 }
 export function SettingsPane({
   hidden = true,

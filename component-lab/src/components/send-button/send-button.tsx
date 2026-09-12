@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
+import { Icon } from "../icons";
 export type SendButtonProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "children"
@@ -16,13 +17,10 @@ export function SendButton({
       type={type}
       {...props}
     >
-      <svg
+      <Icon
+        name="send"
         className="pb-direction-arrow"
-        aria-hidden="true"
-        viewBox="0 0 16 16"
-      >
-        <path d="M8 13V3M4.5 6.5 8 3l3.5 3.5" />
-      </svg>
+      />
     </button>
   );
 }

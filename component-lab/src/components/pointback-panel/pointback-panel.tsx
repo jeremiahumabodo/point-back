@@ -7,6 +7,7 @@ import {
   type ReferenceEditorProps,
 } from "../input-field/reference-editor";
 import { SendButton } from "../send-button";
+import { Icon } from "../icons";
 import {
   SettingsPane,
   HistoryPane,
@@ -109,10 +110,7 @@ export function PointBackPanel({
             onClick={onOpenSettings}
             disabled={busy}
           >
-            <svg aria-hidden="true" viewBox="0 0 16 16">
-              <path d="M6.7 1.2h2.6l.4 1.6c.4.2.8.4 1.1.7l1.6-.5 1.3 2.3-1.2 1.1c.1.4.1.8 0 1.3l1.2 1.1-1.3 2.3-1.6-.5c-.3.3-.7.5-1.1.7l-.4 1.6H6.7l-.4-1.6c-.4-.2-.8-.4-1.1-.7l-1.6.5-1.3-2.3 1.2-1.1a4.5 4.5 0 0 1 0-1.3L2.3 5.3 3.6 3l1.6.5c.3-.3.7-.5 1.1-.7l.4-1.6Z" />
-              <circle cx="8" cy="7" r="2" />
-            </svg>
+            <Icon name="settings" />
           </button>
           <button
             className="pb-theme-toggle"
@@ -123,21 +121,14 @@ export function PointBackPanel({
             title="Toggle dark mode"
             onClick={onToggleTheme}
           >
-            <svg
+            <Icon
+              name="moon"
               className="pb-theme-toggle-moon"
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-            >
-              <path d="M10.8 2.2a5.6 5.6 0 1 0 3 10.1A5.8 5.8 0 0 1 10.8 2.2Z" />
-            </svg>
-            <svg
+            />
+            <Icon
+              name="sun"
               className="pb-theme-toggle-sun"
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-            >
-              <circle cx="8" cy="8" r="2.5" />
-              <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M12.6 3.4l-1 1M4.4 11.6l-1 1" />
-            </svg>
+            />
             <span className="pb-theme-toggle-thumb" aria-hidden="true" />
           </button>
           <button
@@ -147,9 +138,7 @@ export function PointBackPanel({
             title="Close conversation"
             onClick={onClose}
           >
-            <svg aria-hidden="true" viewBox="0 0 16 16">
-              <path d="m4 4 8 8M12 4l-8 8" />
-            </svg>
+            <Icon name="close" />
           </button>
         </div>
       </header>
@@ -191,11 +180,7 @@ export function PointBackPanel({
             onClick={onOpenHistory}
             disabled={busy}
           >
-            <svg aria-hidden="true" viewBox="0 0 16 16">
-              <path d="M2.5 3.5v3h3" />
-              <path d="M3 7a5.5 5.5 0 1 0 1.1-3.3L2.5 5" />
-              <path d="M8 4.5V8l2.5 1.5" />
-            </svg>
+            <Icon name="history" />
           </button>
           <ReferenceEditor
             contentEditable={busy ? "false" : "plaintext-only"}
@@ -209,9 +194,7 @@ export function PointBackPanel({
             onClick={onNewChat}
             disabled={busy}
           >
-            <svg aria-hidden="true" viewBox="0 0 16 16">
-              <path d="m10.8 2.2 3 3-7.6 7.6-3.8.8.8-3.8 7.6-7.6ZM9.2 3.8l3 3M2.5 2.5v3M1 4h3" />
-            </svg>
+            <Icon name="new-chat" />
           </button>
           <button
             className="pb-stop"

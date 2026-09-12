@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
+import { Icon } from "../icons";
 export type ComponentSelectorButtonProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "children"
@@ -17,12 +18,9 @@ export function ComponentSelectorButton({
       type="button"
       {...props}
     >
-      <svg aria-hidden="true" viewBox="0 0 16 16">
-        <rect x="2" y="2" width="12" height="12" rx="1" />
-        <path d="m7 6 3 3-1.5.25L8 11z" />
-      </svg>
+      <Icon name="component-selector" />
       <span className="pb-add-indicator" aria-hidden="true">
-        +
+        <Icon name="plus" />
       </span>
     </button>
   );
