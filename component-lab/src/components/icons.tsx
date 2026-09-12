@@ -4,7 +4,10 @@ export type IconName =
   | "back-arrow"
   | "close"
   | "component-selector"
+  | "component-selector-badge"
+  | "component-remove-badge"
   | "history"
+  | "minus"
   | "new-chat"
   | "plus"
   | "reference"
@@ -21,14 +24,17 @@ const viewBoxes: Record<IconName, string> = {
   "back-arrow": "0 0 16 16",
   close: "0 0 16 16",
   "component-selector": "0 0 16 16",
+  "component-selector-badge": "0 0 12 12",
+  "component-remove-badge": "0 0 12 12",
   history: "0 0 16 16",
   "new-chat": "0 0 16 16",
-  plus: "0 0 12 12",
+  plus: "0 0 16 16",
   reference: "0 0 16 16",
   send: "0 0 16 16",
   settings: "0 0 16 16",
   sun: "0 0 16 16",
   moon: "0 0 16 16",
+  minus: "0 0 8 8",
 };
 
 function iconContent(name: IconName): ReactNode {
@@ -43,6 +49,20 @@ function iconContent(name: IconName): ReactNode {
         <>
           <rect x="2" y="2" width="12" height="12" rx="1" />
           <path d="m7 6 3 3-1.5.25L8 11z" />
+        </>
+      );
+    case "component-selector-badge":
+      return (
+        <>
+          <circle className="pb-add-indicator-circle" cx="6" cy="6" r="5.5" />
+          <path className="pb-add-indicator-plus" d="M6 3v6M3 6h6" />
+        </>
+      );
+    case "component-remove-badge":
+      return (
+        <>
+          <circle className="pb-remove-indicator-circle" cx="6" cy="6" r="5.5" />
+          <path className="pb-remove-indicator-minus" d="M3 6h6" />
         </>
       );
     case "history":
@@ -60,7 +80,7 @@ function iconContent(name: IconName): ReactNode {
         </>
       );
     case "plus":
-      return <path d="M6 2v8M2 6h8" />;
+      return <path d="M8 3v10M3 8h10" />;
     case "reference":
       return (
         <path d="m6.4 9.6 3.2-3.2M5.1 11.9l-1 1a2.5 2.5 0 0 1-3.5-3.5l3-3a2.5 2.5 0 0 1 3.5 0M10.9 4.1l1-1a2.5 2.5 0 0 1 3.5 3.5l-3 3a2.5 2.5 0 0 1-3.5 0" />
@@ -81,6 +101,8 @@ function iconContent(name: IconName): ReactNode {
       );
     case "moon":
       return <path d="M10.8 2.2a5.6 5.6 0 1 0 3 10.1A5.8 5.8 0 0 1 10.8 2.2Z" />;
+    case "minus":
+      return <path d="M1 4h6" />;
   }
 }
 

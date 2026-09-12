@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, Ref } from "react";
+import { Icon } from "../icons";
 
 export type ComponentTagProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -44,7 +45,7 @@ export function ComponentTag({
           type="button"
           disabled={disabled}
         >
-          −
+          <Icon name="component-remove-badge" className="pb-remove-icon" />
         </button>
       )}
     </span>

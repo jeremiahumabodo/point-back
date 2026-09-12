@@ -19,9 +19,10 @@ export function ComponentSelectorButton({
       {...props}
     >
       <Icon name="component-selector" />
-      <span className="pb-add-indicator" aria-hidden="true">
-        <Icon name="plus" />
-      </span>
+      <Icon
+        name="component-selector-badge"
+        className="pb-add-indicator"
+      />
     </button>
   );
 }
