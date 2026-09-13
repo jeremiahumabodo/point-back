@@ -244,6 +244,10 @@
   box-sizing: border-box;
   padding: 0;
   overflow: visible;
+  display: block;
+  fill: var(--pb-action);
+  stroke: var(--pb-bg);
+  stroke-width: 1;
 }
 
 #pointback-root .pb-select-components > svg:not(.pb-add-indicator) {
@@ -255,13 +259,6 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.25;
-}
-
-#pointback-root .pb-add-indicator {
-  display: block;
-  fill: var(--pb-action);
-  stroke: var(--pb-bg);
-  stroke-width: 1;
 }
 
 #pointback-root .pb-add-indicator .pb-add-indicator-circle {

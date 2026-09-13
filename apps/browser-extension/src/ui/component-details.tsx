@@ -1,5 +1,13 @@
 import { ComponentDetails } from "@pointback/ui";
-import type { ComponentFootprint } from "@pointback/protocol";
+import type { ComponentFootprint, SourceLocation } from "@pointback/protocol";
+
+function formatSourceLocation(source: SourceLocation | undefined): string {
+  if (!source) return "";
+  if (!source.lineNumber) return source.fileName;
+  const parts: Array<string | number> = [source.fileName, source.lineNumber];
+  if (source.columnNumber) parts.push(source.columnNumber);
+  return parts.join(":");
+}
 
 /** Present normalized evidence only; no framework internals or DOM resolution. */
 export function ResolvedComponentDetails({
@@ -7,10 +15,9 @@ export function ResolvedComponentDetails({
 }: {
   footprint: ComponentFootprint;
 }) {
-  const source = footprint.react?.component.source;
-  const sourceLocation = source
-    ? `${source.fileName}${source.lineNumber ? `:${source.lineNumber}${source.columnNumber ? `:${source.columnNumber}` : ""}` : ""}`
-    : undefined;
+  const sourceLocation = formatSourceLocation(
+    footprint.react?.component.source,
+  );
   const attributes: Array<[string, string]> = [
     ["tagName", `<${footprint.tagName}>`],
     ["name", footprint.name],

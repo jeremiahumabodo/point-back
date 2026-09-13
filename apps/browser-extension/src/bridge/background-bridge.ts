@@ -1,4 +1,5 @@
-import type { SendRequest, ConversationEvent } from "@pointback/protocol";
+import type { SendRequest } from "@pointback/protocol";
+import { readBridgeEvents, type BridgeEvent } from "./bridge-event-stream.ts";
 
 async function connection() {
   const settings = await browser.storage.local.get([
@@ -47,6 +48,35 @@ async function bridgeFetch(path: string, init: RequestInit = {}) {
     );
   }
   return response;
+}
+
+async function forwardConversation(
+  request: SendRequest,
+  signal: AbortSignal,
+  post: (event: BridgeEvent) => void,
+) {
+  const response = await bridgeFetch("/v1/messages", {
+    method: "POST",
+    body: JSON.stringify(request),
+    signal,
+  });
+  if (!response.body) throw new Error("Bridge returned no response stream.");
+  let terminal = false;
+  for await (const event of readBridgeEvents(response.body)) {
+    terminal ||= event.type === "completed" || event.type === "failed";
+    // Heartbeats also keep the MV3 worker alive while the agent is busy.
+    post(event);
+  }
+  if (!terminal)
+    throw new Error(
+      "Connection ended before completion. Reopen history to check saved messages.",
+    );
+}
+
+function streamFailureMessage(error: unknown, wasCancelled: boolean): string {
+  if (wasCancelled)
+    return "Response stopped or connection lost. Reopen history to check saved messages.";
+  return error instanceof Error ? error.message : "Bridge unavailable.";
 }
 
 export function startBackgroundBridge() {
@@ -104,7 +134,7 @@ export function startBackgroundBridge() {
     const controller = new AbortController();
     let started = false;
     let connected = true;
-    const post = (event: ConversationEvent | { type: "heartbeat" }) => {
+    const post = (event: BridgeEvent) => {
       if (connected) port.postMessage(event);
     };
     port.onDisconnect.addListener(() => {
@@ -119,56 +149,14 @@ export function startBackgroundBridge() {
         }
         if (message.type !== "send" || started) return;
         started = true;
-        let terminal = false;
         try {
-          const response = await bridgeFetch("/v1/messages", {
-            method: "POST",
-            body: JSON.stringify(message.request),
-            signal: controller.signal,
-          });
-          if (!response.body)
-            throw new Error("Bridge returned no response stream.");
-          const reader = response.body
-            .pipeThrough(new TextDecoderStream())
-            .getReader();
-          let buffer = "";
-          try {
-            while (true) {
-              const { value, done } = await reader.read();
-              if (done) break;
-              buffer += value;
-              if (buffer.length > 1_000_000)
-                throw new Error("Bridge event exceeded the safety limit.");
-              let newline: number;
-              while ((newline = buffer.indexOf("\n")) >= 0) {
-                const line = buffer.slice(0, newline);
-                buffer = buffer.slice(newline + 1);
-                if (!line.trim()) continue;
-                const event = JSON.parse(line) as
-                  ConversationEvent | { type: "heartbeat" };
-                terminal ||=
-                  event.type === "completed" || event.type === "failed";
-                // Heartbeats also keep the MV3 worker alive while the agent is busy.
-                post(event);
-              }
-            }
-          } finally {
-            reader.releaseLock();
-          }
-          if (!terminal)
-            throw new Error(
-              "Connection ended before completion. Reopen history to check saved messages.",
-            );
+          await forwardConversation(message.request, controller.signal, post);
         } catch (error) {
           const wasCancelled = controller.signal.aborted;
           controller.abort();
           post({
             type: "failed",
-            message: wasCancelled
-              ? "Response stopped or connection lost. Reopen history to check saved messages."
-              : error instanceof Error
-                ? error.message
-                : "Bridge unavailable.",
+            message: streamFailureMessage(error, wasCancelled),
           });
         } finally {
           if (connected) port.disconnect();

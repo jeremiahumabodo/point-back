@@ -1,5 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
 
+const selectionInstructions = {
+  initial: "Click a component, or drag to select multiple.",
+  add: "Click a component, or drag to add multiple components.",
+  replace: "Click a component to replace the selected tag.",
+  link: "Point to Component",
+};
+
 export function SelectionOverlay({
   mode = null,
   onCancel,
@@ -20,13 +27,7 @@ export function SelectionOverlay({
         hidden={!mode}
       >
         <span className="pb-selection-instruction">
-          {mode === "link"
-            ? "Point to Component"
-            : mode === "replace"
-              ? "Click a component to replace the selected tag."
-              : mode === "add"
-                ? "Click a component, or drag to add multiple components."
-                : "Click a component, or drag to select multiple."}
+          {selectionInstructions[mode ?? "initial"]}
         </span>
         <button
           className="pb-cancel-selection"

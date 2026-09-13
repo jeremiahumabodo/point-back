@@ -66,6 +66,19 @@ test("selection events update React descriptors and singular/plural links withou
   assert.deepEqual(state.composer.references[0].targets, ["first", "third"]);
 });
 
+test("an empty replacement pick preserves the component and its reference links", () => {
+  let state = pick(edit(initialState(), "this"), "original");
+  state = appReducer(state, {
+    type: "start",
+    selection: { mode: "replace", replacement: "original" },
+  });
+  assert.strictEqual(pick(state), state);
+  const replaced = pick(state, "replacement", "ignored");
+  assert.deepEqual(replaced.selected, [component("replacement")]);
+  assert.deepEqual(replaced.composer.references[0].targets, []);
+  assert.equal(replaced.selection, null);
+});
+
 test("removing a token releases selection and cancels its linking mode", () => {
   let state = pick(edit(initialState(), "these"), "first", "second");
   state = edit(state, "");

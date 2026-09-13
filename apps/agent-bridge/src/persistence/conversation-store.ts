@@ -15,7 +15,7 @@ type ThreadRow = {
 };
 
 export class ConversationStore {
-  private db: DatabaseSync;
+  private readonly db: DatabaseSync;
   constructor(path: string) {
     this.db = openDatabase(path);
   }

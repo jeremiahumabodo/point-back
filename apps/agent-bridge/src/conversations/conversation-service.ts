@@ -19,10 +19,10 @@ export type ConversationTurn = {
 
 /** Product lifecycle and durability; no HTTP or vendor protocol details. */
 export class ConversationService {
-  private active = new Map<string, AbortController>();
-  private project: string;
-  private store: ConversationStore;
-  private runAgent: RunAgent;
+  private readonly active = new Map<string, AbortController>();
+  private readonly project: string;
+  private readonly store: ConversationStore;
+  private readonly runAgent: RunAgent;
   constructor(project: string, store: ConversationStore, runAgent: RunAgent) {
     this.project = project;
     this.store = store;

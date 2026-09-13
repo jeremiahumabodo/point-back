@@ -105,6 +105,14 @@ export function usePointBack(surface: BrowserSurface) {
       : state.savedComponents;
     const userId = crypto.randomUUID();
     const assistantId = crypto.randomUUID();
+    const time = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date());
+    const referenceLabel = references.length === 1 ? "reference" : "references";
+    const referenceMetadata = references.length
+      ? ` · ${references.length} ${referenceLabel}`
+      : "";
     hideReferences();
     dispatch({
       type: "send",
@@ -113,7 +121,7 @@ export function usePointBack(surface: BrowserSurface) {
         role: "user",
         content,
         references,
-        metadata: `You · ${new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date())}${references.length ? ` · ${references.length} reference${references.length === 1 ? "" : "s"}` : ""}`,
+        metadata: `You · ${time}${referenceMetadata}`,
       },
       assistant: {
         id: assistantId,

@@ -1,6 +1,6 @@
 @import "@pointback/ui/styles/tokens.css";
-@source "../../../packages/ui/src";
 @import "tailwindcss";
+@source "../../../packages/ui/src";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
