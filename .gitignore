@@ -2,7 +2,7 @@
 node_modules/
 
 # Build output
-/dist/
+dist/
 storybook-static/
 .output/
 .wxt/
@@ -13,8 +13,7 @@ test-results/
 playwright-report/
 
 # Local runtime data
-agent-bridge/data/*.db
-agent-bridge/data/*.db-*
+apps/agent-bridge/data/
 
 # Logs
 *.log
