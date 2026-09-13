@@ -1,74 +1,165 @@
 # PointBack
 
-A browser-native conversational client for local coding agents. Select a running UI element, ask about it, and continue or reopen the conversation in the browser.
+**Talk to your coding agent where you see the problem.**
 
-## Workspace
+PointBack is a browser extension for discussing a running UI with a coding agent.
+
+Instead of copying selectors, hunting for the right component, switching back to your editor, and explaining what you're looking at, you point at the UI and start the conversation there.
 
 ```text
-apps/
-  browser-extension/   WXT extension: selection, context resolution, conversations
-  agent-bridge/        Loopback HTTP API, Codex adapter, local SQLite history
-  component-lab/       Storybook stories and browser integration tests
-packages/
-  protocol/            Product-level context, conversation and event types
-  ui/                  Shared React components and canonical styles
+point at UI
+→ select component
+→ ask a question
+→ PointBack resolves context
+→ Codex responds in the browser
+→ continue the conversation
 ```
 
-Applications depend on workspace packages, not each other's source. `protocol` has no runtime dependencies. `ui` has no extension, bridge, or coding-agent dependencies. Both packages export TypeScript source for workspace consumers; there is no separate package build step.
+PointBack is still a work in progress. The current version proves the core interaction; the next focus is making conversations reliably stay attached to components as the UI changes.
 
-The extension's `entrypoints/` only configure WXT and start the relevant runtime. `src/bootstrap/` owns setup/teardown; `selection/` owns pointer/lasso targeting, live page Element handles, and geometry; `component-resolution/` isolates DOM and private React metadata; `conversations/` contains native editing, reference reconciliation, and stream transport; `bridge/` contains content-to-background messaging and the authenticated HTTP proxy. `application/` owns React application state and event/effect coordination. `ui/` mounts one Shadow DOM React tree: application state → `PointBackRoot` → shared UI props.
+## Why PointBack?
 
-The bridge's `server.ts` composes authentication and routes. `conversations/` owns turn lifecycle and persistence coordination; `agents/` owns agent execution and normalized local events. The public API remains `/health`, `/v1/threads`, `/v1/threads/:id`, and `/v1/messages` (NDJSON). Agent discovery/session endpoints and discussion markers are not added by this refactor.
+Coding agents understand repositories well, but the browser and the agent still live in different contexts.
 
-## Setup
+You can see *this button*. The agent can see `SubmitButton.tsx`. PointBack is an attempt to connect those two worlds so questions like:
 
-Use Node **22.18+** and **pnpm 11.1.2**. Install once at this repository root:
+> Why is this wider than the element above it?
+
+can carry the relevant UI and component context automatically.
+
+The longer-term goal is for discussions to remain spatially attached to the interface: leave the page, come back later, see which components have discussions, and continue where you left off.
+
+## What works today
+
+The current build includes component selection and highlighting, DOM/React component resolution, component ancestry and source metadata where available, multi-turn conversations with Codex, streamed product events, local SQLite conversation history, Codex session resume, Shadow DOM UI isolation, and a local authenticated agent bridge.
+
+The browser extension never needs to understand Codex CLI details. It talks to PointBack's local bridge using product-level messages and events.
+
+## Try it
+
+### Requirements
+
+- Node.js **22.18+**
+- pnpm **11.1.2**
+- Google Chrome
+- Codex CLI installed and logged in (`codex login`)
+- A local web project you want PointBack to inspect
+
+Clone the repository and install dependencies:
 
 ```sh
 pnpm install
-pnpm --filter component-lab exec playwright install chromium
 pnpm build
 ```
 
-Load `apps/browser-extension/.output/chrome-mv3` as an unpacked Chrome extension. If you previously loaded `browser-extension/.output/chrome-mv3`, remove that old entry and load the new path.
+Load this directory as an unpacked extension in `chrome://extensions`:
 
-For the bridge, install and log into Codex locally. In PowerShell:
+```text
+apps/browser-extension/.output/chrome-mv3
+```
+
+Enable **Developer mode**, choose **Load unpacked**, and select that directory.
+
+Next, start the local bridge from the repository root and point it at the project you want Codex to work with.
+
+macOS/Linux:
+
+```sh
+POINTBACK_PROJECT_DIRECTORY=/path/to/your/project pnpm dev:bridge
+```
+
+PowerShell:
 
 ```powershell
-$env:POINTBACK_PROJECT_DIRECTORY = 'C:\path\to\your\repository'
+$env:POINTBACK_PROJECT_DIRECTORY = 'C:\path\to\your\project'
 pnpm dev:bridge
 ```
 
-Or on macOS/Linux:
+The bridge listens on:
 
-```sh
-POINTBACK_PROJECT_DIRECTORY=/path/to/repository pnpm dev:bridge
+```text
+http://127.0.0.1:3000
 ```
 
-Copy the terminal's pairing token into PointBack connection settings. The bridge remains read-only and loopback-only. See [bridge setup and security notes](apps/agent-bridge/README.md).
+It will print a pairing token. Open PointBack's connection settings and enter the bridge address and token.
+
+> **Startup is still developer-oriented.** The current setup deliberately exposes the moving parts while PointBack is under active development. A simpler startup flow is planned so users won't need to manually configure the bridge, project directory, address, and pairing token. The intended experience is closer to installing the extension and running a single PointBack command from the project you want to work on.
+
+Now open your application in Chrome:
+
+```text
+1. Activate PointBack's selector.
+2. Select a UI element.
+3. Ask a question about it.
+4. Continue with a follow-up question.
+5. Close and reopen the panel, or reload the page.
+6. Open Chat history to continue the saved conversation.
+```
+
+The bridge currently runs Codex in a **read-only** mode. PointBack does not provide a code-writing/approval flow yet.
+
+For extension development:
 
 ```sh
 pnpm dev:extension
+```
+
+For the component workspace:
+
+```sh
 pnpm storybook
 ```
 
-Stop/restart any development servers that were started from the old directories. Existing bridge data belongs in `apps/agent-bridge/data/`; keep the database, WAL/SHM files (if present), and token together when migrating a separate checkout. Stop the bridge before moving data. No schema changes or history reset are required.
+## Architecture
 
-## Verification
+```mermaid
+flowchart LR
+    Page["Running Web App"]
+    Extension["Browser Extension"]
+    Bridge["Local Agent Bridge"]
+    Agent["Codex"]
 
-```sh
-pnpm typecheck
-pnpm build
-pnpm test
-pnpm build-storybook
-pnpm --filter component-lab lint
-pnpm --filter component-lab exec vitest run
+    Page <--> Extension
+    Extension <--> Bridge
+    Bridge <--> Agent
 ```
 
-`pnpm test` covers bridge validation, authentication, persistence, resume, subprocess handling and cancellation, then loads the real extension in Chromium. Browser coverage includes style isolation, DOM/React resolution, selection/lasso, replacement, reference editing, settings, streaming, cancellation, retained drafts and history. Tests use fixtures, not a paid agent. A live Codex smoke test remains a separate manual check.
+The repository is a pnpm workspace:
 
-## Styling and UI ownership
+```text
+apps/
+  browser-extension/   WXT extension and browser mechanics
+  agent-bridge/        Fastify API, Codex adapter and SQLite history
+  component-lab/       Storybook and browser integration tests
 
-Existing shared component implementations and CSS are preserved. `packages/ui/src/styles/main.css` is the canonical PointBack stylesheet, used both in the extension's Shadow DOM and Storybook. `tokens.css` and component CSS modules remain in the UI package; the lab retains its Tailwind preview setup. Page cursor/outline effects remain in the extension's `assets/content.css`.
+packages/
+  protocol/            Shared PointBack contracts
+  ui/                  Shared React components and styles
+```
 
-See [UI ownership rules](apps/browser-extension/src/ui/README.md) before changing rendering or native editor/geometry islands.
+A deliberate boundary in the extension is that live DOM elements and React Fiber objects stay in browser-specific code. The rest of PointBack works with normalized component context and opaque handles.
+
+That keeps React responsible for PointBack's UI while pointer tracking, geometry, DOM inspection and component resolution remain browser mechanics.
+
+## Component identity
+
+The next major problem is deciding what it means for a rendered component to still be *the same component* after a rerender or refactor.
+
+PointBack does not assume that a CSS selector, line number, or file path is a permanent identity. The direction is to match components using several pieces of evidence—source location, component ancestry, stable props/keys, route and runtime structure—and fall back to manual confirmation when confidence is low.
+
+That work will power the feature I care most about next:
+
+```text
+talk about component
+→ leave
+→ return later
+→ PointBack finds it again
+→ discussion marker appears
+→ continue the conversation
+```
+
+## Status
+
+PointBack is being built in public and the interaction is still evolving.
+
+Right now I'm deliberately keeping the scope narrow: make the running UI a useful conversational interface to an existing coding agent, rather than turning PointBack into another IDE.

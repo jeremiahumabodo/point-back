@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#6d28d9"/>
+  <!-- Dark wand with a bright tip, angled toward the sparks. -->
+  <path d="M30 94 79 45" fill="none" stroke="#ede9fe" stroke-width="20" stroke-linecap="round"/>
+  <path d="M30 94 67 57" fill="none" stroke="#18181b" stroke-width="14" stroke-linecap="round"/>
+  <path d="m73 51 6-6" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round"/>
+  <!-- Four-point magic sparks. -->
+  <path d="m94 16 4 12 12 4-12 4-4 12-4-12-12-4 12-4Z" fill="#fde047"/>
+  <path d="m45 22 3 9 9 3-9 3-3 9-3-9-9-3 9-3Z" fill="#fde047"/>
+  <path d="m98 65 3 9 9 3-9 3-3 9-3-9-9-3 9-3Z" fill="#fde047"/>
+</svg>
