@@ -1,0 +1,37 @@
+@import "@pointback/ui/styles/tokens.css";
+@source "../../../packages/ui/src";
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-on-surface: #131b2e;
+  --color-on-tertiary: #ffffff;
+  --color-secondary-container: #d0e1fb;
+  --color-on-error-container: #93000a;
+  --color-primary-container: #2563eb;
+  --color-on-primary-fixed-variant: #003ea8;
+  --color-tertiary: #515659;
+  --color-surface: #faf8ff;
+  --color-inverse-primary: #b4c5ff;
+  --color-surface-variant: #dae2fd;
+  --color-on-surface-variant: #434655;
+  --color-outline: #737686;
+  --color-surface-container-highest: #dae2fd;
+  --color-surface-container: #eaedff;
+  --color-surface-container-high: #e2e7ff;
+  --color-surface-container-low: #f2f3ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-primary: #004ac6;
+  --color-secondary: #505f76;
+  --color-background: #faf8ff;
+  --color-on-background: #131b2e;
+  --color-error: #ba1a1a;
+
+  --font-body-md: "Inter", sans-serif;
+  --font-chat-text: "Inter", sans-serif;
+  --font-headline-sm: "Manrope", sans-serif;
+
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}

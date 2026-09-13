@@ -1,0 +1,27 @@
+{
+  "name": "pointback-browser-extension",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "typecheck": "wxt prepare && tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "zip": "wxt zip",
+    "postinstall": "wxt prepare"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "~6.0.3",
+    "wxt": "^0.21.4"
+  },
+  "dependencies": {
+    "@pointback/protocol": "workspace:*",
+    "@pointback/ui": "workspace:*",
+    "prettier": "^3.9.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

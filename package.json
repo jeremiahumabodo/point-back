@@ -1,0 +1,18 @@
+{
+  "name": "pointback",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.1.2",
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "dev:extension": "pnpm --filter pointback-browser-extension dev",
+    "dev:bridge": "pnpm --filter @pointback/agent-bridge start",
+    "storybook": "pnpm --filter component-lab storybook",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm --filter @pointback/agent-bridge test && pnpm --filter pointback-browser-extension test && pnpm --filter component-lab test:extension",
+    "test:extension": "pnpm --filter component-lab test:extension",
+    "test:storybook": "pnpm --filter component-lab exec vitest run",
+    "build-storybook": "pnpm --filter component-lab build-storybook"
+  }
+}
