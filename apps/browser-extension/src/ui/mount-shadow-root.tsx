@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import uiCss from "@pointback/ui/styles/main.css?inline";
 import { PointBackApp } from "../application/PointBackApp";
+import { isolateEditingEvents } from "./isolate-editing-events";
 
 export function mountShadowRoot() {
   const host = document.createElement("div");
@@ -16,6 +17,7 @@ export function mountShadowRoot() {
   root.id = "pointback-root";
   shadow.append(style, root);
   document.documentElement.append(host);
+  const disposeEditingEvents = isolateEditingEvents(shadow);
   const shell = createRoot(root);
   const surface = { root, shadow, host };
   flushSync(() => shell.render(<PointBackApp surface={surface} />));
@@ -24,6 +26,7 @@ export function mountShadowRoot() {
     shadow,
     host,
     dispose() {
+      disposeEditingEvents();
       shell.unmount();
       host.remove();
     },

@@ -18,6 +18,12 @@ PointBackRoot
 - Bridge and stream transport remain plain TypeScript. They emit product events and know nothing about message nodes or UI rendering. Effects dispose subscriptions, cancel unfinished responses, and ignore obsolete async results.
 - Persisted footprints are evidence, not live page identities. No new anchor-matching algorithm is introduced; any future matching belongs behind the browser mechanics boundary.
 
+## Editing event boundary
+
+`isolate-editing-events.ts` stops keyboard, input, composition, and clipboard events from bubbling beyond the ShadowRoot. React's root handlers run first; native default actions are not cancelled. This prevents page-wide bubbling shortcuts from mistaking the shadow host for a non-editable target and stealing focus. It also covers the settings inputs without blocking intentional typing in the page itself.
+
+This does not intercept page capture-phase listeners that run before the event reaches the shadow tree, nor prevent a page from explicitly calling `focus()`. Do not add a global focus trap or blanket `preventDefault` workaround.
+
 ## Explicit DOM islands
 
 React owns the reference editor host and **all composer state**. Native editing owns its descendants, selection ranges, and IME behavior. `reference-editor.ts` reads native input events and renders the React draft with `@pointback/ui/editor`; do not render React children inside the editable host.

@@ -143,6 +143,108 @@ test(
       );
       assert.equal(await page.locator(".pb-send").isDisabled(), true);
 
+      // A page-wide typing shortcut sees the shadow host, not the editor.
+      // It must not steal focus or receive PointBack's editing events.
+      await page.evaluate(() => {
+        const field = document.createElement("input");
+        field.id = "page-search";
+        field.style.cssText = "position:fixed;left:10px;top:10px;width:180px";
+        document.body.append(field);
+        const events = [];
+        const onKey = (event) => {
+          events.push(event.type);
+          const target = event.target;
+          if (
+            event.key.length === 1 &&
+            !target.isContentEditable &&
+            !target.matches("input,textarea")
+          )
+            field.focus();
+        };
+        const onEdit = (event) => events.push(event.type);
+        for (const type of ["keydown", "keypress", "keyup"])
+          document.addEventListener(type, onKey);
+        for (const type of [
+          "beforeinput",
+          "input",
+          "compositionstart",
+          "compositionupdate",
+          "compositionend",
+          "copy",
+          "cut",
+          "paste",
+        ])
+          document.addEventListener(type, onEdit);
+        window.keyboardFixture = { events, onKey, onEdit };
+      });
+      await page.locator(".pb-input").click();
+      await page.keyboard.type("Typing stays here");
+      assert.equal(
+        await page.locator(".pb-input").innerText(),
+        "Typing stays here",
+      );
+      assert.equal(
+        await page
+          .locator(".pb-input")
+          .evaluate((node) => node.getRootNode().activeElement === node),
+        true,
+      );
+      assert.equal(await page.locator("#page-search").inputValue(), "");
+      assert.deepEqual(
+        await page.evaluate(() => window.keyboardFixture.events),
+        [],
+      );
+      // Native editing and React keyboard handling must continue to work.
+      await page.keyboard.press("Shift+Enter");
+      await page.keyboard.type("more");
+      assert.equal(
+        await page.locator(".pb-input").innerText(),
+        "Typing stays here\nmore",
+      );
+      await page.locator(".pb-settings").click();
+      await page.locator(".pb-bridge-token").click();
+      await page.keyboard.type("private-token");
+      assert.equal(
+        await page.locator(".pb-bridge-token").inputValue(),
+        "private-token",
+      );
+      assert.deepEqual(
+        await page.evaluate(() => window.keyboardFixture.events),
+        [],
+      );
+      await page.locator(".pb-settings-cancel").click();
+      // Deliberately focusing the page should still allow normal page typing.
+      await page.locator("#page-search").click();
+      await page.keyboard.type("page text");
+      assert.equal(
+        await page.locator("#page-search").inputValue(),
+        "page text",
+      );
+      assert.ok(
+        (await page.evaluate(() => window.keyboardFixture.events)).includes(
+          "input",
+        ),
+      );
+      await page.evaluate(() => {
+        const { onKey, onEdit } = window.keyboardFixture;
+        for (const type of ["keydown", "keypress", "keyup"])
+          document.removeEventListener(type, onKey);
+        for (const type of [
+          "beforeinput",
+          "input",
+          "compositionstart",
+          "compositionupdate",
+          "compositionend",
+          "copy",
+          "cut",
+          "paste",
+        ])
+          document.removeEventListener(type, onEdit);
+        document.querySelector("#page-search").remove();
+        delete window.keyboardFixture;
+      });
+      await page.locator(".pb-new-chat").click();
+
       // MAIN-world metadata must still cross the isolated-world resolver boundary.
       await page.evaluate(() => {
         document.querySelector("#target").__reactFiber$fixture = {
