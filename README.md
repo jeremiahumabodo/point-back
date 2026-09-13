@@ -17,6 +17,10 @@ point at UI
 
 PointBack is still a work in progress. The current version proves the core interaction; the next focus is making conversations reliably stay attached to components as the UI changes.
 
+## Demo
+
+![PointBack demo: discussing a running UI with a coding agent](./pointback-demo.gif)
+
 ## Why PointBack?
 
 Coding agents understand repositories well, but the browser and the agent still live in different contexts.
