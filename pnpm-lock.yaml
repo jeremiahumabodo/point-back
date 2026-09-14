@@ -80,8 +80,8 @@ importers:
         version: 4.3.3
     devDependencies:
       '@chromatic-com/storybook':
-        specifier: 5.3.0
-        version: 5.3.0(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.0))
+        specifier: 5.3.1
+        version: 5.3.1(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.0))
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
@@ -291,11 +291,11 @@ packages:
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
 
-  '@chromatic-com/storybook@5.3.0':
-    resolution: {integrity: sha512-gMAfVYJnF/tjdY8C3Q54KYz/low2NFjPIZMpCqSFuMUiTJ2DNWCTb7mFhuuzZ1iduWFDhewlJyilFmvKcEDYRA==}
+  '@chromatic-com/storybook@5.3.1':
+    resolution: {integrity: sha512-eUcbR9CddVmKAnjOiBCOz5rNdT096jiXIjR+qaWbUuTlgRdpc9yjTrk4/hiPAAykZrPYVNJN11p6rJgW9KNpKg==}
     engines: {node: '>=20.0.0', yarn: '>=1.22.18'}
     peerDependencies:
-      storybook: ^0.0.0-0 || ^10.1.0 || ^10.1.0-0 || ^10.2.0-0 || ^10.3.0-0 || ^10.4.0-0 || ^10.5.0-0 || ^10.6.0-0
+      storybook: ^0.0.0-0 || ^10.1.0 || ^10.1.0-0 || ^10.2.0-0 || ^10.3.0-0 || ^10.4.0-0 || ^10.5.0-0 || ^10.6.0-0 || ^11.0.0-0
 
   '@emnapi/core@1.11.0':
     resolution: {integrity: sha512-l9Oo58x0HOP5znGzVhYW9U3e5wVuA4LAZU2AGezTmkhO1CgQRFDhDg4nneHsu/t3WniXg9QrG2nIXL/ZS8ln8Q==}
@@ -3450,7 +3450,7 @@ snapshots:
       hashery: 1.5.1
       keyv: 5.6.0
 
-  '@chromatic-com/storybook@5.3.0(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.0))':
+  '@chromatic-com/storybook@5.3.1(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.6)(react@19.3.0))':
     dependencies:
       '@neoconfetti/react': 1.0.0
       chromatic: 18.8.1
